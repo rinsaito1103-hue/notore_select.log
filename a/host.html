@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👨‍🏫 農トレ - 管理者ダッシュボード</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        /* =========================================
+           管理者用ダッシュボード 1画面レイアウト
+        ========================================= */
+        body {
+            margin: 0; padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            height: 100vh;
+            overflow: hidden; /* 画面全体のスクロールを禁止 */
+        }
+
+        .dashboard-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 15px;
+            box-sizing: border-box;
+            gap: 15px;
+        }
+
+        /* 🟢 ヘッダー */
+        .admin-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #fff; padding: 12px 20px;
+            border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .admin-header h1 { margin: 0; font-size: 20px; color: #1e40af; }
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .room-input { padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 14px; font-weight: bold; width: 150px; }
+        .btn { padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: #fff; font-size: 14px; transition: 0.2s; }
+        .btn-blue { background: #3b82f6; } .btn-blue:hover { background: #2563eb; }
+        .btn-green { background: #10b981; } .btn-green:hover { background: #059669; }
+        .btn-red { background: #ef4444; } .btn-red:hover { background: #dc2626; }
+        
+        #connection-status { font-size: 12px; font-weight: bold; color: #64748b; }
+
+        /* 🟢 メイン画面（左右分割） */
+        .admin-main {
+            display: grid;
+            grid-template-columns: 380px 1fr; /* 左: 操作・ランキング、右: グラフ */
+            gap: 15px;
+            flex-grow: 1; 
+            overflow: hidden; 
+        }
+
+        /* 🟢 左カラム */
+        .left-col { display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+        .panel { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #1e40af; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
+        
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #475569; }
+        .control-group select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 14px; }
+
+        /* ランキング表 */
+        .ranking-panel { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .table-wrap { flex-grow: 1; overflow-y: auto; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8fafc; padding: 8px; text-align: left; position: sticky; top: 0; box-shadow: 0 1px 0 #cbd5e1; color: #64748b; }
+        td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
+        .rank-icon { font-size: 16px; font-weight: bold; }
+
+        /* 🟢 右カラム */
+        .right-col { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        .chart-wrap { flex-grow: 1; position: relative; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <header class="admin-header">
+            <h1>🖥️ 農トレ 管理者ダッシュボード</h1>
+            <div class="header-controls">
+                <span id="connection-status">🔴 未接続</span>
+                <input type="text" id="room-id-input" class="room-input" placeholder="ルームID (例: zemi)">
+                <button id="connect-btn" class="btn btn-blue">🔗 接続・更新</button>
+                <button id="download-csv-btn" class="btn btn-green">📥 CSV出力</button>
+            </div>
+        </header>
+
+        <main class="admin-main">
+            
+            <div class="left-col">
+                <div class="panel">
+                    <h3>📢 イベント一斉配信</h3>
+                    <div class="control-group">
+                        <label>🌍 全体環境イベント (価格変動)</label>
+                        <select id="global-select">
+                            <option value="random">🎲 ランダム（全班共通で何かが発生）</option>
+                            <option value="normal" selected>通常（変動なし）</option>
+                            <option value="boom_exotic">📈 ブーム（外来野菜: アーティチョーク高騰）</option>
+                            <option value="boom_traditional">📈 ブーム（伝統野菜: 仙台白菜高騰）</option>
+                            <option value="bumper_crop">📉 豊作貧乏（一般的な野菜の価格暴落）</option>
+                            <option value="poor_crop">📈 全国的な凶作（価格急高騰）</option>
+                            <option value="fuel_surge">💸 燃料・資材コスト高騰（費用増加）</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>📍 局地環境イベント (収量変動)</label>
+                        <select id="local-select">
+                            <option value="random_per_team">🎲 班ごとにランダム（明暗が分かれる）</option>
+                            <option value="normal" selected>平和な気候（変動なし）</option>
+                            <option value="pest">🐛 害虫発生（農薬で防御可能）</option>
+                            <option value="disease">🦠 病気発生（防御不可・被害大）</option>
+                            <option value="heavy_rain">☔ 豪雨・台風（ハウスで防御可能）</option>
+                            <option value="bad_growth">🌫️ 生育不良（肥料で防御可能）</option>
+                            <option value="animal_damage">🐗 獣害（全滅・ハウス破壊）</option>
+                            <option value="good_weather">☀️ 奇跡の好天候（収穫量2倍）</option>
+                        </select>
+                    </div>
+                    <button id="broadcast-btn" class="btn btn-red" style="width: 100%;">🚀 イベントを全班に送信する</button>
+                </div>
+
+                <div class="panel ranking-panel">
+                    <h3>🏆 リアルタイム順位</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>順位</th><th>班名</th><th>年度</th><th style="text-align: right;">総資金</th></tr>
+                            </thead>
+                            <tbody id="ranking-tbody">
+                                <tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">ルームに接続してください</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1e40af;">📈 資金推移チャート</h3>
+                <div class="chart-wrap">
+                    <canvas id="trend-chart"></canvas>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // 🌟 Supabaseの設定
+            const SUPABASE_URL = 'https://lozwsuhkcbuzbdynnyml.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvendzdWhrY2J1emJkeW5ueW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NDg1MzgsImV4cCI6MjA5NjEyNDUzOH0.bmk4mz5NyNUqWlImBqWBRISQAzJq3GF6Ply7mG3yNAc';
+            const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            let currentRoomId = "";
+            let currentChannel = null;
+            let rankingChannel = null;
+            let trendChart = null;
+
+            // DOM要素
+            const statusEl = document.getElementById("connection-status");
+            const rankingTbody = document.getElementById("ranking-tbody");
+
+            // 🟢 1. ルーム接続処理
+            document.getElementById("connect-btn").addEventListener("click", () => {
+                const roomId = document.getElementById("room-id-input").value.trim();
+                if (!roomId) { alert("ルームIDを入力してください！"); return; }
+
+                currentRoomId = roomId;
+
+                // イベント配信用チャンネル設定
+                if (currentChannel) supabaseClient.removeChannel(currentChannel);
+                currentChannel = supabaseClient.channel(`room-${roomId}`);
+                currentChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        statusEl.innerHTML = `🟢 接続中: ${roomId}`;
+                        statusEl.style.color = "#10b981";
+                    }
+                });
+
+                // リアルタイムデータ受信用チャンネル設定
+                if (rankingChannel) supabaseClient.removeChannel(rankingChannel);
+                rankingChannel = supabaseClient.channel(`ranking-${roomId}`)
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'yearly_logs', filter: `room_id=eq.${roomId}` }, () => {
+                        fetchDashboardData(); // データが追加されたら画面を更新
+                    }).subscribe();
+
+                // 初回データ取得
+                fetchDashboardData();
+            });
+
+            // 🟢 2. イベント一斉送信処理
+            document.getElementById("broadcast-btn").addEventListener("click", async () => {
+                if (!currentChannel || !currentRoomId) { alert("先に接続してください"); return; }
+                
+                const globalSelect = document.getElementById("global-select");
+                const localSelect = document.getElementById("local-select");
+                
+                let globalId = globalSelect.value;
+                let globalName = globalSelect.options[globalSelect.selectedIndex].text;
+                if (globalId === "random") {
+                    const options = Array.from(globalSelect.options).slice(1);
+                    const randOpt = options[Math.floor(Math.random() * options.length)];
+                    globalId = randOpt.value; globalName = randOpt.text + " (抽選)";
+                }
+
+                if (!confirm(`【イベント送信確認】\n全体環境: ${globalName}\n局地環境: ${localSelect.options[localSelect.selectedIndex].text}\n\nこのイベントを全班に送信しますか？`)) return;
+
+                await currentChannel.send({
+                    type: 'broadcast',
+                    event: 'yearly_events',
+                    payload: { global_id: globalId, local_id: localSelect.value }
+                });
+                alert("✅ 全班にイベントを送信しました！");
+            });
+
+            // 🟢 3. ランキング＆グラフ データ取得処理
+            async function fetchDashboardData() {
+                if (!currentRoomId) return;
+
+                const { data, error } = await supabaseClient
+                    .from('yearly_logs')
+                    .select('player_name, year, current_money')
+                    .eq('room_id', currentRoomId)
+                    .order('year', { ascending: true });
+
+                if (error || !data) return;
+
+                // ランキング用に最新年度データを抽出
+                const latestDataMap = {};
+                const chartDataMap = {}; // グラフ用 { player_name: { year: money } }
+                let maxYear = 0;
+
+                data.forEach(log => {
+                    const pName = log.player_name;
+                    const money = Number(log.current_money) || 0;
+                    
+                    // ランキング用
+                    if (!latestDataMap[pName] || latestDataMap[pName].year < log.year) {
+                        latestDataMap[pName] = { player_name: pName, year: log.year, current_money: money };
+                    }
+                    
+                    // グラフ用
+                    if (!chartDataMap[pName]) chartDataMap[pName] = { 0: 50000000 }; // 初期資金5,000万円
+                    chartDataMap[pName][log.year] = money;
+                    if (log.year > maxYear) maxYear = log.year;
+                });
+
+                // 🏆 ランキング描画
+                const rankingArray = Object.values(latestDataMap).sort((a, b) => b.current_money - a.current_money);
+                rankingTbody.innerHTML = "";
+                
+                if (rankingArray.length === 0) {
+                    rankingTbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">データがありません</td></tr>`;
+                } else {
+                    rankingArray.forEach((p, idx) => {
+                        let rankIcon = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+                        let bg = idx === 0 ? "background: #fefce8;" : "";
+                        rankingTbody.innerHTML += `
+                            <tr style="${bg}">
+                                <td class="rank-icon">${rankIcon}</td>
+                                <td style="font-weight:bold;">${p.player_name}</td>
+                                <td style="color:#64748b; font-size:12px;">第${p.year}年</td>
+                                <td style="text-align:right; font-weight:bold; color:#16a34a;">¥${p.current_money.toLocaleString()}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                // 📈 グラフ描画
+                drawChart(chartDataMap, maxYear);
+            }
+
+            // 🟢 4. グラフ描画ロジック
+            function drawChart(chartDataMap, maxYear) {
+                const ctx = document.getElementById('trend-chart');
+                const labels = ["初期"];
+                for (let i = 1; i <= maxYear; i++) labels.push(`第${i}年`);
+
+                const datasets = [];
+                const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+                let cIdx = 0;
+
+                for (const [pName, years] of Object.entries(chartDataMap)) {
+                    const dataPoints = [];
+                    let lastVal = 50000000;
+                    for (let i = 0; i <= maxYear; i++) {
+                        if (years[i] !== undefined) lastVal = years[i];
+                        dataPoints.push(Math.round(lastVal / 10000)); // 万円単位
+                    }
+                    datasets.push({
+                        label: pName,
+                        data: dataPoints,
+                        borderColor: colors[cIdx % colors.length],
+                        backgroundColor: colors[cIdx % colors.length],
+                        tension: 0.1, borderWidth: 2, pointRadius: 4
+                    });
+                    cIdx++;
+                }
+
+                if (trendChart) trendChart.destroy();
+                trendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right' } },
+                        scales: { y: { title: { display: true, text: '総資金残高 (万円)' } } }
+                    }
+                });
+            }
+
+            // 🟢 5. CSVダウンロード処理
+            document.getElementById("download-csv-btn").addEventListener("click", async () => {
+                if (!currentRoomId) { alert("接続してください"); return; }
+                const { data, error } = await supabaseClient.from('yearly_logs').select('*').eq('room_id', currentRoomId).order('player_name').order('year');
+                if (error || !data || data.length === 0) { alert("データがありません"); return; }
+
+                let csv = "班名,群,土地,年度,導入資材,雇用人数,全体環境,局地環境,売上高(円),費用(円),純利益(円),農地別詳細データ,要因分析\n";
+                data.forEach(log => {
+                    csv += `"${log.player_name}","${log.log_group === 'log' ? 'ログあり' : log.log_group === 'nolog' ? 'ログなし' : ''}","${log.land_name || ''}",${log.year},"${log.investments}",${log.staff_count},"${log.global_event}","${log.local_event}",${log.sales},${log.expense},${log.net_profit},"${log.land_details || ''}","${log.feedback}"\n`;
+                });
+
+                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `農トレ_集計_${currentRoomId}.csv`;
+                link.click();
+            });
+        });
+    </script>
+</body>
+</html>

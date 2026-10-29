@@ -1,0 +1,991 @@
+/* ==========================================================================
+   🚜 農業経営シミュレーションゲーム「Nototore」最適化スタイルシート（完全版）
+   ========================================================================== */
+
+/* --- 1. 全般・基本リセット --- */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    background-color: #f4f7f6;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* --- 2. 【画面1】スタートタイトル画面 --- */
+#start-screen {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-image: url('Title.webp'); /* ※拡張子がpngの場合は直してください */
+    /* 🌟 背景の大きさと位置を自分で計算し、タイトル文字を画面の上に寄せる
+       （Title.webp は 1280×853。タイトル文字は画像の幅を1としたとき、上端0.118〜下端0.356の位置にある） */
+    --bg-w: max(100vw, 150.06vh);                 /* cover と同じ：画面を覆う最小の幅 */
+    --bg-h: calc(var(--bg-w) * 0.6664);           /* 853 / 1280 */
+    --bg-y: min(0px, max(calc(100vh - var(--bg-h)), calc(20px - var(--bg-w) * 0.118))); /* タイトル上端を画面上から20pxに（画像の端は出さない） */
+    --title-bottom: calc(var(--bg-y) + var(--bg-w) * 0.356); /* 画面上でのタイトル文字の下端 */
+    background-size: var(--bg-w) auto;
+    background-position: center var(--bg-y);
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+    /* 🌟 入力パネルはタイトル文字より下の空きスペースの中央に置く（タイトルと重ならない） */
+    padding: calc(var(--title-bottom) + 8px) 0 12px;
+    justify-content: center;
+    justify-content: safe center; /* 画面に収まらない場合だけ上から表示してスクロール */
+    align-items: center;
+    overflow-x: hidden;
+    overflow-y: auto; /* メンバー入力欄が増えても、スクロールで全体を見られるようにする */
+}
+
+.overlay {
+    position: fixed; /* 🌟 スクロールしても背景に固定（一緒に動かない） */
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    /* 🌟 背景の絵と文字が綺麗に見えるよう、暗さを少し控えめに調整 */
+    background: rgba(51, 46, 46, 0.10);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 🌟 手前の白い入力パネル（横長バージョン） */
+.start-card {
+    position: relative;
+    z-index: 10;
+    background: #ffffff;
+    width: 95%;
+    max-width: 920px; /* 🌟 横幅を広く取り、そのぶん縦を短くしてタイトルに重ならないようにする */
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 18px 28px;
+    border-radius: 16px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* 🌟 入力欄のデザイン（縦並び ➔ 横並びに変更） */
+.input-section {
+    display: flex;
+    flex-direction: row; 
+    gap: 20px;
+}
+
+.input-group {
+    flex: 1; /* IDと名前の入力欄を左右均等の幅にする */
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    font-weight: bold;
+    color: #475569;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.input-group input,
+input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 15px;
+    color: #1e293b;
+    box-sizing: border-box;
+    transition: 0.2s;
+}
+
+.input-group input:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* 🌟 難易度選択エリアのデザイン（これも横並びに変更） */
+.difficulty-section {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+    display: flex;
+    align-items: center; /* ラベルとボタンの縦位置を揃える */
+    gap: 20px;
+}
+
+.section-label {
+    font-weight: bold;
+    color: #475569;
+    margin: 0; /* 縦の余白をなくす */
+    font-size: 14px;
+    white-space: nowrap; /* 「難易度を選択：」が改行されないようにする */
+}
+
+.button-group {
+    display: flex;
+    flex: 1; /* 残りのスペースをボタンで埋める */
+    gap: 15px;
+}
+
+/* ボタン共通デザイン */
+.btn-diff {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: bold;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-diff:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* 初心者ボタン（緑） */
+.btn-beginner { background-color: #10b981; }
+.btn-beginner:hover { background-color: #059669; }
+
+/* 上級者ボタン（赤） */
+.btn-advanced { background-color: #ef4444; }
+.btn-advanced:hover { background-color: #dc2626; }
+
+/* --- 3. 【画面2】戦略設定画面（2列ワイドダッシュボード構造） --- */
+#setup-screen {
+    width: 100% !important;
+    max-width: 1600px !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
+    display: block ; /* 中央寄せの呪いを完全解除 */
+}
+
+#setup-content-wide {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+}
+
+/* 👈 左側サイドバー：土地情報＆通期財務サマリー */
+.setup-left-sidebar {
+    flex: 0 0 320px; /* 幅を320pxに完全固定して文字潰れを徹底防御 */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.setup-left-sidebar h2 {
+    font-size: 24px;
+    color: #1e40af;
+    margin: 0;
+    font-weight: bold;
+    line-height: 1.3;
+}
+
+/* 👉 右側メインコンテンツ：ルール案内、カードグリッド、開始ボタン */
+.setup-main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0; /* 子要素のはみ出しを物理的に防ぐ */
+}
+
+/* 🌟 4枚のカードを2×2（最大3列）に並べるグリッド構造 */
+#land-cards-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+}
+
+/* 土地戦略カード1枚1枚のベース設計 */
+.land-strategy-card {
+    background: #ffffff !important; 
+    border: 2px solid #cbd5e1 !important; 
+    padding: 15px !important; 
+    border-radius: 12px !important; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    box-sizing: border-box;
+}
+
+.land-strategy-card h4 {
+    font-size: 15px !important;
+    margin: 0 !important;
+    padding-bottom: 6px !important;
+    border-bottom: 2px solid #2e75b6 !important;
+    color: #1e40af;
+}
+
+/* 🌟 カード内部の「左右2列分け」のバグを完全修正 */
+.card-inner-flex {
+    display: flex !important;
+    gap: 15px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.land-strategy-card-left {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    min-width: 0;
+}
+
+.land-strategy-card-right {
+    flex: 1.2 !important;
+    border-left: 1px dashed #cbd5e1 !important;
+    padding-left: 15px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    min-width: 0;
+}
+
+/* カード内パーツのサイズ微調整 */
+.land-strategy-card label {
+    font-size: 11px !important;
+    font-weight: bold;
+    color: #475569;
+    margin: 0 0 3px 0 !important;
+    display: block;
+}
+
+.land-strategy-card select {
+    width: 100% !important;
+    padding: 6px !important;
+    border-radius: 6px !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 12px !important;
+    background-color: #f8fafc;
+    box-sizing: border-box;
+}
+
+/* 👤 スタッフドロップダウン用コンテナ */
+.worker-row-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+}
+
+/* 🛠️ 農業資材チェックボックス枠（文字消えを100%防ぐ縦並びフレックス） */
+.asset-mini-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    background: #f8fafc !important;
+    padding: 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.land-strategy-card label.asset-label {
+    font-weight: normal !important;
+    font-size: 11px !important;
+    display: flex !important;
+    align-items: center !important;
+    white-space: normal !important; /* 文字の自動折り返しを許可 */
+    cursor: pointer;
+    margin: 0 !important;
+    line-height: 1.4;
+}
+
+.land-strategy-card input[type="checkbox"] {
+    margin-right: 6px !important;
+    transform: scale(1.0) !important;
+    flex-shrink: 0; /* チェックボックス自体が横に潰れるのを防ぐ */
+}
+
+/* 💡 農業資材の説明ツールチップ（カーソルを乗せると表示、既存UIには影響なし） */
+.land-strategy-card label.asset-label {
+    position: relative;
+}
+
+.asset-label[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    bottom: 100%;
+    margin-bottom: 8px;
+    background: #1e293b;
+    color: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: normal;
+    line-height: 1.5;
+    white-space: normal;
+    width: 220px;
+    max-width: 60vw;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 999;
+    pointer-events: none;
+}
+
+.asset-label[data-tooltip]:hover::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    bottom: 100%;
+    margin-bottom: 2px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1e293b transparent transparent transparent;
+    z-index: 999;
+    pointer-events: none;
+}
+
+/* 💰 各農地のリアルタイム投資小計カウンター */
+.land-cost-counter {
+    display: flex !important; /* 🌟 要素を横並びにする魔法の呪文 */
+    justify-content: space-between !important; /* 🌟 左・中央・右に均等に散らす */
+    align-items: center !important; /* 🌟 縦の高さも中央で揃える */
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    padding: 10px 15px !important;
+    border-radius: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    margin-top: 10px;
+}
+
+/* 経営開始ボタン */
+#begin-business-btn {
+    align-self: flex-end;
+    background-color: #2e75b6;
+    color: white;
+    padding: 12px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    width: auto !important; /* 幅が100%に広がるのを防ぐ */
+}
+#begin-business-btn:hover { background-color: #1e40af; }
+
+
+/* --- 4. 【画面3】メインゲーム ＆ 決算ダッシュボード画面 --- */
+#game-container {
+    background: #fff;
+    padding: 35px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    width: 90%;
+    max-width: 1000px; /* ワイドに広げてテーブルを見やすく */
+    border-top: 8px solid #2ecc71; 
+}
+
+.status-panel {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: left;
+}
+
+#financial-dashboard {
+    background: #ffffff;
+    border: 2px solid #2e75b6;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    animation: fadeIn 0.4s ease;
+}
+
+#dashboard-title {
+    margin-top: 0;
+    color: #1e40af;
+    border-bottom: 3px double #2e75b6;
+    padding-bottom: 8px;
+    font-size: 20px;
+    text-align: left;
+}
+
+/* 🎲 環境イベント表示カード */
+.event-display-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.event-card {
+    flex: 1;
+    padding: 10px 15px;
+    border-radius: 8px;
+    text-align: left;
+    position: relative;
+}
+
+.global-event-card { background: #eff6ff; border: 1px solid #bfdbfe; }
+.local-event-card { background: #fef2f2; border: 1px solid #fecaca; }
+
+.event-badge {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: white;
+}
+.global-event-card .event-badge { background-color: #3b82f6; }
+.local-event-card .event-badge { background-color: #ef4444; }
+.event-card h4 { margin: 5px 0 0 0; font-size: 16px; color: #1e293b; }
+
+/* 📉 財務損益（P/L）ステートメント */
+.financial-statement-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+.financial-statement-box h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #334155;
+    border-left: 4px solid #1e40af;
+    padding-left: 8px;
+}
+.statement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+.statement-item {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.statement-item .stat-label { font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px; }
+.statement-item .stat-value { font-size: 16px; font-weight: bold; color: #1e293b; text-align: right; }
+
+.expense-color { border-left: 4px solid #ef4444 !important; }
+.expense-color .stat-value { color: #dc2626; }
+.revenue-color { border-left: 4px solid #22c55e !important; }
+.revenue-color .stat-value { color: #16a34a; }
+.total-color { border-left: 4px solid #3b82f6 !important; background: #eff6ff !important; }
+.total-color .stat-value { color: #1e40af; font-size: 18px; }
+
+/* 📋 決算結果詳細マトリクステーブル */
+.table-responsive {
+    overflow-x: auto;
+    margin-top: 15px;
+}
+.dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: center;
+}
+.dashboard-table th {
+    background-color: #2e75b6;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
+}
+.dashboard-table td {
+    padding: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+}
+.dashboard-table tr:nth-child(even) { background-color: #f8fafc; }
+
+.stat-down { color: #dc2626; font-weight: bold; } 
+.stat-up { color: #16a34a; font-weight: bold; }   
+
+/* メイン画面の決算・次へボタン */
+#end-year-btn, #next-year-phase-btn {
+    width: auto !important;
+    display: inline-block;
+}
+
+/* --- 5. 【画面4】ゲーム結果（リザルト）画面 --- */
+#result-screen {
+    background: #fff;
+    padding: 35px;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    border-top: 8px solid #1e40af;
+}
+
+.highlight-text { color: #27ae60; font-weight: bold; font-size: 18px; }
+
+/* アニメーション */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- 📊【新設】戦略設定画面用：営農計画シミュレーター（スプレッドシート風） --- */
+
+.live-simulation-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 10px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+}
+
+.live-simulation-table th, .live-simulation-table td {
+    border: 1px solid #cbd5e1;
+    padding: 4px 8px;
+    text-align: left;
+}
+
+/* スプレッドシート風の色分け */
+.live-simulation-table th {
+    background-color: #f1f5f9;
+    color: #475569;
+    font-weight: bold;
+    text-align: center;
+}
+
+.row-revenue-header { background-color: #e0f2fe !important; font-weight: bold; } /* 売上行（水色） */
+.row-expense-header { background-color: #fee2e2 !important; font-weight: bold; } /* 費用行（赤色） */
+.row-profit-header { background-color: #ccfbf1 !important; font-weight: bold; font-size: 12px; } /* 見込利益（緑色） */
+
+.text-right {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+/* カード自体の高さを自動調整できるように微調整 */
+.land-strategy-card {
+    height: auto !important;
+}
+
+/* 💡 農業戦略カードを常に綺麗な横2列で縦に伸ばす設定 */
+#land-cards-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    width: 100%;
+    box-sizing: border-box;
+    align-items: start;
+}
+
+/* ===== 土地公開スクリーン ===== */
+#land-reveal-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+.land-reveal-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(3px) brightness(0.6);
+    transform: scale(1.05);
+}
+.land-reveal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+}
+.land-reveal-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    width: 100%;
+    max-width: 760px;
+    animation: revealSlideUp 0.6s ease both;
+}
+@keyframes revealSlideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.land-reveal-header-text {
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 20px;
+    border-radius: 20px;
+    margin: 0;
+}
+.land-reveal-card {
+    background: rgba(255,255,255,0.96);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: flex;
+    width: 100%;
+    animation: cardPop 0.5s 0.3s ease both;
+}
+@keyframes cardPop {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.land-reveal-img-wrap {
+    width: 320px;
+    min-width: 320px;
+    height: auto;        /* ← 260px から変更 */
+    min-height: 260px;   /* ← 追加 */
+    overflow: hidden;
+    flex-shrink: 0;
+    align-self: stretch; /* ← 追加：カードの高さに合わせて伸びる */
+}
+.land-reveal-img-wrap img {
+    width: 100%;
+    height: 100%;
+    min-height: 260px;   /* ← 追加 */
+    object-fit: cover;
+    display: block;
+}
+.land-reveal-info {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+.land-reveal-info h2 {
+    font-size: 26px;
+    color: #1e40af;
+    margin: 0;
+    border-bottom: 3px solid #2e75b6;
+    padding-bottom: 8px;
+}
+.land-reveal-info p {
+    font-size: 13px;
+    color: #475569;
+    margin: 0;
+    line-height: 1.6;
+}
+.land-reveal-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+}
+.land-stat-item {
+    background: #f1f5f9;
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.land-stat-label {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: bold;
+}
+.land-stat-value {
+    font-size: 14px;
+    font-weight: bold;
+    color: #1e293b;
+}
+#land-reveal-proceed-btn {
+    background: #2e75b6;
+    color: white;
+    border: none;
+    padding: 14px 48px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    animation: cardPop 0.4s 0.6s ease both;
+    transition: background 0.2s;
+}
+#land-reveal-proceed-btn:hover {
+    background: #1e40af;
+}
+
+/* ==========================================================================
+   🌟 追加：PDCAログモーダル用スタイル
+   ========================================================================== */
+/* サイドバー内に設置（通期財務サマリーの下）／最終結果画面にも同じ見た目で設置 */
+#log-toggle-btn,
+#log-toggle-btn-result {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 15px 25px;
+    background-color: #2e75b6;
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 15px;
+    transition: all 0.2s ease;
+}
+#log-toggle-btn-result {
+    width: auto;
+    display: inline-block;
+    padding: 15px 30px;
+}
+#log-toggle-btn:hover, #log-toggle-btn-result:hover { background-color: #1e40af; transform: translateY(-3px); }
+
+/* モーダルの背景と本体 */
+.modal-overlay {
+    display: none; /* 初期は非表示 */
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    justify-content: center; align-items: center;
+}
+.modal-content {
+    background-color: #f8fafc;
+    width: 90%; max-width: 800px; height: 85vh;
+    border-radius: 12px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: modalSlideUp 0.3s ease;
+}
+@keyframes modalSlideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.modal-header {
+    padding: 15px 25px; background: #fff; border-radius: 12px 12px 0 0;
+    border-bottom: 2px solid #cbd5e1; display: flex;
+    justify-content: space-between; align-items: center;
+}
+.close-btn { background: none; border: none; font-size: 16px; font-weight: bold; color: #64748b; cursor: pointer; }
+.close-btn:hover { color: #dc2626; }
+.modal-body { padding: 25px; overflow-y: auto; flex-grow: 1; }
+
+/* ログカードのデザイン */
+.log-card {
+    background: #fff; border-left: 5px solid #2e75b6;
+    border-radius: 8px; padding: 15px; margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: left;
+}
+.pdca-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px; }
+.pdca-block { background: #f1f5f9; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
+.pdca-block strong { color: #475569; display: block; font-size: 13px; margin-bottom: 8px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+.pdca-block ul { margin: 0; padding-left: 20px; font-size: 13px; color: #334155; }
+
+/* 🌟 ステータス表示エリア（サイドバー内・通期財務サマリーの下） */
+#status-bar {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 12px;
+    font-weight: bold;
+    color: #475569;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+/* =========================================
+   管理者用ダッシュボード 1画面レイアウト
+========================================= */
+body.admin-mode {
+    margin: 0;
+    padding: 0;
+    background-color: #e2e8f0;
+    height: 100vh;
+    overflow: hidden; /* 画面全体のスクロールを禁止 */
+}
+
+.admin-dashboard-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* 🟢 上部ヘッダーバー */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.admin-header h1 {
+    margin: 0;
+    font-size: 20px;
+    color: #1e40af;
+}
+
+/* 🟢 メイン画面（左右分割グリッド） */
+.admin-main {
+    display: grid;
+    grid-template-columns: 350px 1fr; /* 左カラムは350px固定、右カラムは残り全部 */
+    gap: 15px;
+    flex-grow: 1; 
+    overflow: hidden; 
+}
+
+/* 🟢 左カラム（操作パネル＋ランキング） */
+.admin-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow: hidden;
+}
+
+.admin-control-panel, .ranking-board {
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ranking-board {
+    flex-grow: 1; /* ランキング枠を画面下まで伸ばす */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.table-scroll-area {
+    flex-grow: 1;
+    overflow-y: auto; /* 人数が多い場合、ランキングの表だけがスクロールする */
+    margin-top: 10px;
+}
+
+/* 🟢 右カラム（グラフ専用エリア） */
+.admin-right-col {
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.canvas-container {
+    flex-grow: 1; /* グラフを枠いっぱいに広げる */
+    position: relative;
+}
+
+/* --- 🌟 チーム人数・メンバー入力欄（学籍番号と氏名） --- */
+.input-group-size { flex: 0 0 130px; }
+
+.input-group select {
+    width: 100%;
+    padding: 10px 10px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 15px;
+    color: #1e293b;
+    box-sizing: border-box;
+}
+
+.input-group select:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.member-section {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+    display: flex;
+    align-items: flex-start; /* 「メンバー：」を左に置き、入力欄を右に並べる */
+    gap: 16px;
+}
+
+.member-section .section-label {
+    padding-top: 1px;
+}
+
+/* 🌟 1人ずつ縦（番号・学籍番号・氏名）にまとめ、最大5人を横一列に並べる（人数が増えても高さが変わらない） */
+#member-fields {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px 10px;
+}
+
+.member-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.member-row .member-no {
+    font-size: 12px;
+    font-weight: bold;
+    color: #475569;
+}
+
+.member-row input[type="text"] {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 14px;
+}
+
+/* 背の低い画面（ノートPCのブラウザなど）では余白をさらに詰めて、タイトルを隠さないようにする */
+@media (max-height: 760px) {
+    .start-card { padding: 12px 24px; gap: 10px; }
+    .input-group label { margin-bottom: 3px; }
+    .input-group input, .input-group select { padding-top: 7px; padding-bottom: 7px; }
+    .member-section, .difficulty-section { padding-top: 10px; }
+    .member-row input[type="text"] { padding-top: 6px; padding-bottom: 6px; }
+    .btn-diff { padding: 10px 0; }
+}
+
+/* 狭い画面（スマートフォンなど）では1人1行の縦並びに戻す */
+@media (max-width: 640px) {
+    .member-section { flex-direction: column; gap: 8px; }
+    #member-fields { grid-template-columns: 1fr; width: 100%; }
+    .member-row { flex-direction: row; align-items: center; gap: 8px; }
+    .member-row .member-no { flex: 0 0 42px; }
+    .member-row .member-id-input { flex: 0 0 120px; width: 120px; }
+    .member-row .member-name-input { flex: 1; width: auto; min-width: 0; }
+}

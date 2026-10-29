@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>営農型農業経営シミュレーション「農トレ」</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+   <div id="start-screen">
+        <div class="overlay"></div>
+
+        <div class="start-card">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="room-id-input">🔑 ルームID：</label>
+                    <input type="text" id="room-id-input" placeholder="例：zemi2026">
+                </div>
+                
+                <div class="input-group">
+                    <label for="name-input">👥 チーム名：</label>
+                    <input type="text" id="name-input" placeholder="例：1班">
+                </div>
+
+                <div class="input-group input-group-size">
+                    <label for="team-size-select">🧑‍🤝‍🧑 チーム人数：</label>
+                    <select id="team-size-select">
+                        <option value="">選択</option>
+                        <option value="1">1人</option>
+                        <option value="2">2人</option>
+                        <option value="3">3人</option>
+                        <option value="4">4人</option>
+                        <option value="5">5人</option>
+                    </select>
+                </div>
+
+                <!-- 🌟 実験用：先生が事前に抽選して配った「土地番号」を入力する（群ごとに土地の構成をそろえるため） -->
+                <div class="input-group input-group-size">
+                    <label for="land-no-select">🎫 土地番号：</label>
+                    <select id="land-no-select">
+                        <option value="">選択</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 🌟 チーム人数に応じて、学籍番号と氏名の入力欄を表示する（最大5人） -->
+            <div id="member-section" class="member-section hidden">
+                <p class="section-label">メンバー：</p>
+                <div id="member-fields"></div>
+            </div>
+
+            <div class="difficulty-section">
+                <div class="button-group">
+                    <button id="start-game-btn" class="btn-diff btn-beginner">🌱 ゲームスタート</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 土地公開スクリーン（新規追加） ===== -->
+<div id="land-reveal-screen" class="hidden">
+    <div class="land-reveal-bg" id="land-reveal-bg"></div>
+    <div class="land-reveal-overlay"></div>
+    <div class="land-reveal-content">
+        <p class="land-reveal-header-text">🎲 あなたの農地が決まりました！</p>
+        <div class="land-reveal-card" id="land-reveal-card">
+            <div class="land-reveal-img-wrap">
+                <img id="land-reveal-img" src="" alt="農地画像">
+            </div>
+            <div class="land-reveal-info">
+                <h2 id="land-reveal-name">---</h2>
+                <p id="land-reveal-desc">---</p>
+                <div class="land-reveal-stats">
+                    <div class="land-stat-item">
+                        <span class="land-stat-label">💰 年間賃料</span>
+                        <span id="land-reveal-cost" class="land-stat-value">---</span>
+                    </div>
+                    <div class="land-stat-item">
+                        <span class="land-stat-label">⚡ 土地パワー推移</span>
+                        <span id="land-reveal-power" class="land-stat-value">---</span>
+                    </div>
+                    <div class="land-stat-item">
+                        <span class="land-stat-label">👤 必要人数推移</span>
+                        <span id="land-reveal-workers" class="land-stat-value">---</span>
+                    </div>
+                    <div class="land-stat-item">
+                        <span class="land-stat-label">🗺️ 土地枚数</span>
+                        <span id="land-reveal-cards" class="land-stat-value">---</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button id="land-reveal-proceed-btn">この農地で戦略設定へ進む ➔</button>
+    </div>
+</div>
+
+    <div id="setup-screen" class="hidden">
+        <div id="setup-content-wide" style="display: flex; flex-direction: row; gap: 25px; align-items: flex-start; width: 100%; flex-wrap: nowrap; margin-top: 20px;">
+            
+            <div class="setup-left-sidebar" style="width: 320px; min-width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 15px;">
+                <h2 style="margin-top: 0;">🚜 第 <span id="setup-year-display">1</span> 年目<br>経営戦略設定</h2>
+                
+                <div style="background: #e2f0d9; padding: 15px; border-radius: 8px; border: 2px solid #70ad47;">
+                    <h3 id="setup-land-name" style="margin: 0 0 5px 0; color: #385723; font-size: 18px;">-</h3>
+                    <p id="setup-land-desc" style="font-size: 12px; color: #595959; margin: 0; line-height: 1.4;">-</p>
+                </div>
+
+                <div class="financial-summary-banner" style="background: #f1f5f9; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #475569;">📊 通期財務サマリー</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="background:#fff; padding: 6px 10px; border-radius:4px; border:1px solid #e2e8f0;">
+                            <span style="font-size:10px; color:#64748b; display:block;">現在残高（投資見込）</span>
+                            <span id="sum-current-money" style="font-size:14px; font-weight:bold; color:#1e40af; display:block; text-align:right;">50,000,000 円</span>
+                        </div>
+                        <div style="background:#fff; padding: 6px 10px; border-radius:4px; border:1px solid #e2e8f0;">
+                            <span style="font-size:10px; color:#64748b; display:block;">累計費用</span>
+                            <span id="sum-cum-expense" style="font-size:14px; font-weight:bold; color:#dc2626; display:block; text-align:right;">0 円</span>
+                        </div>
+                        <div style="background:#fff; padding: 6px 10px; border-radius:4px; border:1px solid #e2e8f0;">
+                            <span style="font-size:10px; color:#64748b; display:block;">累計収益</span>
+                            <span id="sum-cum-revenue" style="font-size:14px; font-weight:bold; color:#16a34a; display:block; text-align:right;">0 円</span>
+                        </div>
+                        <div style="background:#fff; padding: 6px 10px; border-radius:4px; border:1px solid #e2e8f0; border-left: 4px solid #64748b;">
+                            <span style="font-size:10px; color:#64748b; display:block;">初期資本金比 (通期損益)</span>
+                            <span id="sum-net-change" style="font-size:14px; font-weight:bold; color:#64748b; display:block; text-align:right;">±0 円 (維持)</span>
+                        </div>
+                        
+                        <div style="background:#fff; padding: 10px; border-radius:4px; border:1px solid #e2e8f0; margin-top: 5px; height: 180px; position: relative;">
+                            <canvas id="financial-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="status-bar" class="hidden">
+                    🔑 ID: <span id="display-room-id">-</span>
+                </div>
+
+            </div>
+
+            <div class="setup-main-content" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px;">
+                <p style="margin:0; font-weight: bold; color: #d94111; background: #fff2cc; padding: 8px 12px; border-radius: 5px; font-size: 12px;">
+                    ⚠️ 【ルール】各土地にスタッフを配置し、導入する資材（施設含む）を選んでください。※資材・施設は1面につき最大3つまで選択可能です。
+                </p>
+
+                <div id="land-cards-container"></div>
+
+                <button id="begin-business-btn">🎯 この戦略で今年の経営を開始する</button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <h2>経営メイン画面（第 <span id="current-year">1</span> 年目）</h2>
+
+        <div class="status-panel" style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: left;">
+            <p>👥 チーム: <span id="display-player-name" style="font-weight: bold;">-</span></p>
+            <p>🗺️ 選択された農地: <span id="land-name" style="font-weight: bold; color: #2e75b6;">-</span></p>
+            <p>💰 現在の総経営資金: <span id="money" style="font-weight: bold; color: #1e40af; font-size: 20px;">-</span> 円</p>
+        </div>
+
+        <div id="financial-dashboard" class="hidden">
+            <h3 id="dashboard-title">📊 第 1 年度 決算ダッシュボード</h3>
+            
+            <div class="event-display-row">
+                <div class="event-card global-event-card">
+                    <span class="event-badge">全体環境</span>
+                    <h4 id="dash-global-event-name">⚖️ 通常気象</h4>
+                </div>
+                <div class="event-card local-event-card">
+                    <span class="event-badge">局地環境</span>
+                    <h4 id="dash-local-event-name">⚖️ 影響なし</h4>
+                </div>
+            </div>
+
+            <div class="financial-statement-box">
+                <h4>📈 本年度の資金経過・損益状況</h4>
+                <div class="statement-grid">
+                    <div class="statement-item">
+                        <span class="stat-label">① 期首（投資前）資金額:</span>
+                        <span id="stmt-start-money" class="stat-value">0 円</span>
+                    </div>
+                    <div class="statement-item expense-color">
+                        <span class="stat-label">② 本年度の投資総額（費用）:</span>
+                        <span id="stmt-total-expense" class="stat-value">- 0 円</span>
+                    </div>
+                    <div class="statement-item revenue-color">
+                        <span class="stat-label">③ 本年度の総売上高（収益）:</span>
+                        <span id="stmt-total-revenue" class="stat-value">＋ 0 円</span>
+                    </div>
+                    <div class="statement-item total-color">
+                        <span class="stat-label">④ 期末（次年度繰越）資金額:</span>
+                        <span id="stmt-end-money" class="stat-value">0 円</span>
+                    </div>
+                </div>
+            </div>
+
+            <h4 style="text-align: left; margin: 20px 0 8px 0; color: #334155; font-size: 14px;">🗺️ 農地別 決算内訳</h4>
+            <div class="table-responsive">
+                <table class="dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>農地</th>
+                            <th>作付 / 出荷先</th>
+                            <th>予定収穫量</th>
+                            <th>イベント後収量</th>
+                            <th>基準価格</th>
+                            <th>イベント後価格</th>
+                            <th>最終売上高</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-table-body">
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="reflection-report-box" style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #cbd5e1; border-left: 5px solid #2e75b6; margin-top: 20px; text-align: left;">
+                <h3 style="margin: 0 0 12px 0; color: #1e3a8a; font-size: 16px;">🔍 本年度の経営振り返り ＆ 要因分析（PDCA）</h3>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #334155;">
+                    <p style="margin: 0;">📊 <strong>期待予実ギャップ :</strong> <span id="reflect-gap" style="font-weight: bold;">-</span></p>
+                    <p style="margin: 0;">🌍 <strong>外部環境の要因分析 :</strong> <span id="reflect-global-reason">-</span></p>
+                    <p style="margin: 0;">📍 <strong>局地・内部の要因分析 :</strong> <span id="reflect-local-reason">-</span></p>
+                </div>
+
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #cbd5e1; font-size: 13px;">
+                    <label style="font-weight: bold; color: #1e3a8a;">🎯 次期に向けた経営改善方針 (Action) を設定してください :</label><br>
+                    <select style="width: 100%; padding: 8px; margin-top: 6px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                        <option>【人材投資】スタッフの配置や技術レベル（教育・IT補正）を見直す</option>
+                        <option>【リスク管理】施設・農機などの設備投資を強化し、気象災害リスクをヘッジする</option>
+                        <option>【販売戦略】出荷先の条件（有機必須や数量上限）と作物の相性を再計算する</option>
+                        <option>【経営多角化】全ての土地に同じ作物を植えず、ポートフォリオを分散させる</option>
+                    </select>
+                </div>
+            </div>
+
+        </div>
+
+        <div style="margin-top: 25px;">
+            <button id="end-year-btn" style="padding: 12px 35px; font-size: 18px; font-weight: bold; background-color: #c65911; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                📄 この年度の決算を行う
+            </button>
+            <button id="next-year-phase-btn" class="hidden" style="padding: 12px 35px; font-size: 18px; font-weight: bold; background-color: #2e75b6; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">
+                次年度の戦略設定へ進む ➔
+            </button>
+        </div>
+    </div>
+
+    <div id="result-screen" class="hidden">
+        <div class="setup-content" style="text-align: center; max-width: 800px; margin: 0 auto; padding: 20px;">
+            <h2>🎉 3年間経営お疲れ様でした！</h2>
+            
+            <div class="status-board" style="margin: 20px auto; max-width: 400px;">
+                <p>最終総資産: <span id="final-money" class="highlight-text">0</span> 円</p>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #cbd5e1; margin: 25px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <h3 style="margin-top: 0; color: #334155; font-size: 16px; text-align: left;">📈 3年間の財務推移レポート（費用・収益・資産残高）</h3>
+                <div style="position: relative; height: 280px; width: 100%;">
+                    <canvas id="final-financial-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="info-box" style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                <h3>👑 経営評価ランク</h3>
+                <p id="result-rank" style="font-size: 24px; font-weight: bold; color: #d94111; margin: 10px 0;">---</p>
+                <p id="result-comment">評価コメント</p>
+            </div>
+
+            <button onclick="restartGame();" style="background: #28a745; color: white; padding: 12px 35px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                タイトルに戻って再挑戦
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets.js"></script>
+    <script src="crops.js"></script>
+    <script src="lands.js"></script>
+    <script src="employees.js"></script>
+    <script src="markets.js"></script>
+    <script src="events.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config_advanced.js"></script>
+    
+    <script src="game.js?v=23-nolog"></script> 
+
+</body>
+</html>
