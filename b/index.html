@@ -51,6 +51,17 @@
     </div>
 
     <!-- ===== 土地公開スクリーン（新規追加） ===== -->
+<!-- 🌟 実験用：先生が土地を一斉発表するまでの待機画面 -->
+<div id="land-wait-screen" class="hidden">
+    <div class="land-wait-card">
+        <div class="land-wait-icon">🎲</div>
+        <h2>土地の発表を待っています</h2>
+        <p>先生が全チームの土地を一斉に発表します。<br>この画面のまま、しばらくお待ちください。</p>
+        <p class="land-wait-team">チーム：<span id="land-wait-team-name">-</span></p>
+        <div class="land-wait-dots"><span></span><span></span><span></span></div>
+    </div>
+</div>
+
 <div id="land-reveal-screen" class="hidden">
     <div class="land-reveal-bg" id="land-reveal-bg"></div>
     <div class="land-reveal-overlay"></div>
@@ -276,7 +287,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config_advanced.js"></script>
     
-    <script src="game.js?v=25-autoland"></script> 
+    <script src="game.js?v=26-reveal"></script> 
 
 </body>
 </html>

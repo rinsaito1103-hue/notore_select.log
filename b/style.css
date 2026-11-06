@@ -602,6 +602,41 @@ input[type="text"] {
     align-items: start;
 }
 
+/* ===== 土地の発表待ちスクリーン（実験用） ===== */
+#land-wait-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: linear-gradient(160deg, #14532d 0%, #1e3a2b 100%);
+    z-index: 100;
+}
+.land-wait-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 28px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+.land-wait-icon { font-size: 48px; animation: landWaitSpin 2.4s ease-in-out infinite; }
+.land-wait-card h2 { margin: 12px 0 8px; color: #14532d; font-size: 22px; }
+.land-wait-card p { margin: 6px 0; color: #475569; line-height: 1.7; font-size: 14px; }
+.land-wait-team { font-weight: bold; color: #1e293b !important; }
+.land-wait-dots { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+.land-wait-dots span {
+    width: 10px; height: 10px; border-radius: 50%; background: #16a34a;
+    animation: landWaitDot 1.2s ease-in-out infinite;
+}
+.land-wait-dots span:nth-child(2) { animation-delay: 0.2s; }
+.land-wait-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes landWaitSpin { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(20deg); } }
+@keyframes landWaitDot { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
 /* ===== 土地公開スクリーン ===== */
 #land-reveal-screen {
     position: fixed;

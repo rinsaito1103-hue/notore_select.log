@@ -39,6 +39,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // --- 2. 画面要素（DOM）の取得 ---
 const startScreen = document.getElementById("start-screen");
 const landRevealScreen = document.getElementById("land-reveal-screen");
+const landWaitScreen = document.getElementById("land-wait-screen");
 const setupScreen = document.getElementById("setup-screen");
 const gameContainer = document.getElementById("game-container");
 const resultScreen = document.getElementById("result-screen");
@@ -651,74 +652,48 @@ function saveTeamMembers(roomId, teamName, members) {
 }
 
 // --- 4. 画面遷移：タイトル ➔ セットアップ ---
-// 🧪 実験用：同じルームIDのチーム数を数えて、6種類の土地が偏らないように自動で割り当てる
-//   参加した順番（Supabaseに登録された順）に並べて、全チームの土地を次の規則で順に決める
-//   ① 自分の群（ログあり/なし）の中で、まだ割り当てが最も少ない土地
-//   ② それでも同数なら、もう一方の群で多く配られている土地（もう一方の群と構成をそろえる）
-//   ③ それでも同数なら、ルームIDから決まる順番（ルームごとにランダム）で先の土地
-//   → どの端末で計算しても同じ結果になるので、複数のチームが同時にスタートしても偏らない
-function seededLandOrder(seedText) {
-    let h = 2166136261;
-    for (const ch of seedText) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
-    const rand = () => { h = (Math.imul(h, 1103515245) + 12345) >>> 0; return h / 4294967296; };
-    const order = LAND_MASTER.slice();
-    for (let i = order.length - 1; i > 0; i--) {
-        const j = Math.floor(rand() * (i + 1));
-        [order[i], order[j]] = [order[j], order[i]];
-    }
-    return order;
-}
+// 🧪 実験用：土地の一斉発表
+//   スタートを押すと参加登録だけを行い、待機画面で先生の合図を待つ
+//   土地は管理者画面の「土地を一斉発表」で、ルーム内で偏りがないように全チーム分まとめて決まる
+const findLandById = id => LAND_MASTER.find(l => l.id === id);
+let landWaitTimer = null;
 
-function computeLandAllocation(rows, roomId) {
-    const order = seededLandOrder(roomId);
-    const counts = {};
-    const result = [];
-    rows.forEach(r => {
-        const group = r.log_group || "";
-        if (!counts[group]) { counts[group] = {}; LAND_MASTER.forEach(l => { counts[group][l.id] = 0; }); }
-        const mine = counts[group];
-        const other = {};
-        LAND_MASTER.forEach(l => {
-            other[l.id] = Object.keys(counts).filter(k => k !== group).reduce((sum, k) => sum + counts[k][l.id], 0);
-        });
-        let candidates = order.slice();
-        const minMine = Math.min(...candidates.map(l => mine[l.id]));
-        candidates = candidates.filter(l => mine[l.id] === minMine);
-        const maxOther = Math.max(...candidates.map(l => other[l.id]));
-        candidates = candidates.filter(l => other[l.id] === maxOther);
-        const land = candidates[0];
-        mine[land.id]++;
-        result.push(land);
-    });
-    return result;
-}
-
-async function assignBalancedLand(roomId, teamName) {
+// 参加登録（同じチーム名ですでに登録済みなら、その登録をそのまま使う）
+async function registerForLand(roomId, teamName) {
     try {
-        // ① 参加を登録する（同じチーム名ですでに登録済みなら、その登録をそのまま使う）
         const ins = await supabaseClient.from('team_lands').insert([{
             room_id: roomId, team_name: teamName, log_group: LOG_GROUP
         }]);
         if (ins.error && ins.error.code !== '23505') throw ins.error;
-
-        // ② ルームの全チームを参加順に並べ、全員分の土地を同じ規則で計算する
-        const { data, error } = await supabaseClient.from('team_lands')
-            .select('id, team_name, log_group').eq('room_id', roomId).order('id', { ascending: true });
-        if (error) throw error;
-        const myIndex = data.findIndex(r => r.team_name === teamName && r.log_group === LOG_GROUP);
-        if (myIndex < 0) throw new Error("参加登録が見つかりません");
-        const land = computeLandAllocation(data, roomId)[myIndex];
-
-        // ③ 分析用に、決まった土地を記録しておく（失敗してもゲームは続ける）
-        supabaseClient.from('team_lands').update({ land_id: land.id, land_name: land.name })
-            .eq('id', data[myIndex].id)
-            .then(res => { if (res.error) console.error("土地の記録エラー:", res.error); });
-        return land;
+        return true;
     } catch (err) {
-        // 通信できない・表がない場合でもゲームは続けられるよう、ランダムで割り当てる
-        console.error("土地の自動割り当てに失敗したため、ランダムで決めます:", err);
-        return LAND_MASTER[Math.floor(Math.random() * LAND_MASTER.length)];
+        console.error("参加登録に失敗しました:", err);
+        return false;
     }
+}
+
+// 自分の土地が発表済みか確認する（発表済みなら土地公開画面へ）
+async function checkMyLand() {
+    if (gamePhase !== "waiting") return;
+    try {
+        const { data, error } = await supabaseClient.from('team_lands').select('land_id')
+            .eq('room_id', gameState.roomId).eq('log_group', LOG_GROUP).eq('team_name', gameState.playerName);
+        if (error) throw error;
+        const land = data && data.length > 0 ? findLandById(data[0].land_id) : null;
+        if (land && gamePhase === "waiting") revealLand(land);
+    } catch (err) {
+        console.error("土地の確認に失敗しました:", err);
+    }
+}
+
+// 待機画面を表示し、先生の合図（またはSupabaseの記録）を待つ
+function waitForLandReveal() {
+    document.getElementById("land-wait-team-name").textContent = gameState.playerName;
+    startScreen.classList.add("hidden");
+    landWaitScreen.classList.remove("hidden");
+    if (landWaitTimer) clearInterval(landWaitTimer);
+    landWaitTimer = setInterval(checkMyLand, 4000); // 合図を受け取れなかった場合の保険
+    checkMyLand();
 }
 
 async function startGame(config) {
@@ -729,14 +704,14 @@ async function startGame(config) {
     const teamResult = collectTeamMembers();
     if (teamResult.error) { alert(teamResult.error); return; }
 
-    // 🌟 土地を自動で割り当てる（通信の間はボタンを押せないようにする）
+    // 🌟 参加登録（通信の間はボタンを押せないようにする）
     const startBtnLabel = startGameBtn.textContent;
     startGameBtn.disabled = true;
-    startGameBtn.textContent = "🎲 土地を抽選中…";
-    const assignedLand = await assignBalancedLand(roomId, name);
+    startGameBtn.textContent = "📡 接続中…";
+    const registered = await registerForLand(roomId, name);
     startGameBtn.disabled = false;
     startGameBtn.textContent = startBtnLabel;
-    
+
     gameState.roomId = roomId; // 🌟ルームIDを保存
     gameState.playerName = name; // 🌟「チーム名」として使う（ランキングやデータ保存の識別子）
     gameState.members = teamResult.members; // 🌟学籍番号と氏名（最大5人）
@@ -753,9 +728,25 @@ async function startGame(config) {
     gameState.money = config.startMoney;
     gameState.history[0].money = config.startMoney;
 
-    // 🌟 実験用：ルーム内で偏りが出ないように自動で割り当てた土地（土地公開画面で発表される）
-    gameState.currentLand = assignedLand;
-    const land = gameState.currentLand;
+    // 🌟 ステータスバーを更新して表示
+    document.getElementById("display-room-id").textContent = gameState.roomId;
+    document.getElementById("status-bar").classList.remove("hidden");
+
+    if (registered) {
+        // 先生の「土地を一斉発表」を待つ
+        gamePhase = "waiting";
+        saveProgress();
+        waitForLandReveal();
+    } else {
+        // 通信できない・表がない場合でもゲームは続けられるよう、ランダムで割り当てる
+        revealLand(LAND_MASTER[Math.floor(Math.random() * LAND_MASTER.length)]);
+    }
+}
+
+// 決まった土地を土地公開画面で発表する
+function revealLand(land) {
+    if (landWaitTimer) { clearInterval(landWaitTimer); landWaitTimer = null; }
+    gameState.currentLand = land;
     
     // 農地の枚数分だけ、土壌ダメージのカウンターを用意する（連作障害用）
     gameState.landHistory = Array(land.totalCards).fill(null).map(() => ({ 
@@ -779,11 +770,8 @@ async function startGame(config) {
     document.getElementById("land-reveal-cards").textContent = `${land.totalCards}枚`;
 
     startScreen.classList.add("hidden");
+    landWaitScreen.classList.add("hidden");
     landRevealScreen.classList.remove("hidden");
-
-    // 🌟 ステータスバーを更新して表示
-    document.getElementById("display-room-id").textContent = gameState.roomId;
-    document.getElementById("status-bar").classList.remove("hidden");
 
     gamePhase = "reveal";
     saveProgress();
@@ -1695,6 +1683,8 @@ function renderLogs() {
 // 先生からのイベントを受信するチャンネルに接続する
 function subscribeRoomEvents(roomId) {
     const channel = supabaseClient.channel(`room-${roomId}`);
+    // 🌟 先生が「土地を一斉発表」を押したら、自分の土地を確認する
+    channel.on('broadcast', { event: 'lands_revealed' }, () => { checkMyLand(); });
     channel.on('broadcast', { event: 'yearly_events' }, payload => {
         console.log("📡 先生からイベントを受信しました！", payload);
         const globalId = payload.payload.global_id;
@@ -1759,6 +1749,15 @@ function restoreProgress(saved) {
     pendingNextEvents = saved.pendingNextEvents;
     gamePhase = saved.gamePhase;
 
+    if (gamePhase === "waiting") {
+        // 土地の発表待ちで再読み込みした場合は、待機画面に戻る
+        document.getElementById("display-room-id").textContent = gameState.roomId;
+        document.getElementById("status-bar").classList.remove("hidden");
+        subscribeRoomEvents(gameState.roomId);
+        waitForLandReveal();
+        return;
+    }
+
     document.getElementById("display-room-id").textContent = gameState.roomId;
     document.getElementById("status-bar").classList.remove("hidden");
     displayPlayerName.textContent = gameState.playerName;
@@ -1802,9 +1801,10 @@ function restoreProgress(saved) {
 (function resumeIfSaved() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
-    if (!saved || !saved.gameState || !saved.gameState.currentLand || saved.gamePhase === "title") return;
+    if (!saved || !saved.gameState || saved.gamePhase === "title") return;
+    if (!saved.gameState.currentLand && saved.gamePhase !== "waiting") return;
 
-    const label = saved.gamePhase === "finished" ? "3年間の結果" : `第${saved.gameState.year}年目`;
+    const label = saved.gamePhase === "finished" ? "3年間の結果" : saved.gamePhase === "waiting" ? "土地の発表待ち" : `第${saved.gameState.year}年目`;
     if (confirm(`前回のゲーム（${saved.gameState.playerName}・${label}）の続きから再開しますか？\n「キャンセル」を押すと最初から始めます。`)) {
         restoreProgress(saved);
     } else {

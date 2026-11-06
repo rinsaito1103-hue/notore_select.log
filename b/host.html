@@ -6,6 +6,7 @@
     <title>👨‍🏫 農トレ - 管理者ダッシュボード</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="lands.js"></script>
     <style>
         /* =========================================
            管理者用ダッシュボード 1画面レイアウト
@@ -93,6 +94,19 @@
         <main class="admin-main">
             
             <div class="left-col">
+                <div class="panel">
+                    <h3>🎲 土地の一斉発表</h3>
+                    <p id="land-join-summary" style="margin: 0 0 8px; font-size: 13px; color: #475569;">ルームに接続すると、参加チームが表示されます</p>
+                    <div class="table-wrap" style="max-height: 160px; margin-bottom: 10px;">
+                        <table>
+                            <thead><tr><th>受付</th><th>班名</th><th>群</th><th>土地</th></tr></thead>
+                            <tbody id="land-join-tbody"></tbody>
+                        </table>
+                    </div>
+                    <button id="reveal-lands-btn" class="btn btn-blue" style="width: 100%;">🎲 土地を一斉発表する</button>
+                    <p style="margin: 6px 0 0; font-size: 11px; color: #64748b;">全チームがそろってから押してください。あとから来たチームがいたら、もう一度押すとそのチームにも配られます（すでに配った土地は変わりません）。</p>
+                </div>
+
                 <div class="panel">
                     <h3>📢 イベント一斉配信</h3>
                     <div class="control-group">
@@ -190,6 +204,95 @@
 
                 // 初回データ取得
                 fetchDashboardData();
+                fetchJoinedTeams();
+                if (joinTimer) clearInterval(joinTimer);
+                joinTimer = setInterval(fetchJoinedTeams, 5000);
+            });
+
+            // 🎲 土地の一斉発表 ------------------------------------------------
+            //   参加した順番（受付番号）に並べて、全チームの土地を次の規則で順に決める
+            //   ① そのチームの群（ログあり/なし）の中で、まだ割り当てが最も少ない土地
+            //   ② それでも同数なら、もう一方の群で多く配られている土地（両群の構成をそろえる）
+            //   ③ それでも同数なら、ルームIDから決まる順番（ルームごとにランダム）で先の土地
+            //   → 何度押しても、すでに配った土地は変わらない
+            let joinTimer = null;
+            const GROUP_LABEL = { log: "ログあり", nolog: "ログなし" };
+
+            function seededLandOrder(seedText) {
+                let h = 2166136261;
+                for (const ch of seedText) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
+                const rand = () => { h = (Math.imul(h, 1103515245) + 12345) >>> 0; return h / 4294967296; };
+                const order = LAND_MASTER.slice();
+                for (let i = order.length - 1; i > 0; i--) {
+                    const j = Math.floor(rand() * (i + 1));
+                    [order[i], order[j]] = [order[j], order[i]];
+                }
+                return order;
+            }
+
+            function computeLandAllocation(rows, roomId) {
+                const order = seededLandOrder(roomId);
+                const counts = {};
+                return rows.map(r => {
+                    const group = r.log_group || "";
+                    if (!counts[group]) { counts[group] = {}; LAND_MASTER.forEach(l => { counts[group][l.id] = 0; }); }
+                    const mine = counts[group];
+                    const other = {};
+                    LAND_MASTER.forEach(l => {
+                        other[l.id] = Object.keys(counts).filter(k => k !== group).reduce((sum, k) => sum + counts[k][l.id], 0);
+                    });
+                    let candidates = order.slice();
+                    const minMine = Math.min(...candidates.map(l => mine[l.id]));
+                    candidates = candidates.filter(l => mine[l.id] === minMine);
+                    const maxOther = Math.max(...candidates.map(l => other[l.id]));
+                    candidates = candidates.filter(l => other[l.id] === maxOther);
+                    mine[candidates[0].id]++;
+                    return candidates[0];
+                });
+            }
+
+            async function loadJoinedTeams() {
+                const { data, error } = await supabaseClient.from('team_lands')
+                    .select('id, team_name, log_group, land_id, land_name')
+                    .eq('room_id', currentRoomId).order('id', { ascending: true });
+                if (error) { console.error("参加チームの取得エラー:", error); return null; }
+                return data || [];
+            }
+
+            async function fetchJoinedTeams() {
+                if (!currentRoomId) return;
+                const rows = await loadJoinedTeams();
+                if (!rows) return;
+                const tbody = document.getElementById("land-join-tbody");
+                tbody.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.team_name}</td><td>${GROUP_LABEL[r.log_group] || r.log_group || '-'}</td><td>${r.land_name || '<span style="color:#94a3b8">未発表</span>'}</td></tr>`).join("");
+                const nLog = rows.filter(r => r.log_group === "log").length;
+                const nNolog = rows.filter(r => r.log_group === "nolog").length;
+                const waiting = rows.filter(r => !r.land_id).length;
+                document.getElementById("land-join-summary").textContent =
+                    `参加 ${rows.length}チーム（ログあり ${nLog}・ログなし ${nNolog}）／ 発表待ち ${waiting}チーム`;
+            }
+
+            document.getElementById("reveal-lands-btn").addEventListener("click", async () => {
+                if (!currentChannel || !currentRoomId) { alert("先に接続してください"); return; }
+                const rows = await loadJoinedTeams();
+                if (!rows) { alert("参加チームを取得できませんでした。Supabaseの設定を確認してください。"); return; }
+                const pending = rows.filter(r => !r.land_id);
+                if (rows.length === 0) { alert("まだ参加しているチームがありません。"); return; }
+                if (!confirm(`参加 ${rows.length}チームのうち、まだ土地が決まっていない ${pending.length}チームに土地を発表します。よろしいですか？`)) return;
+
+                const lands = computeLandAllocation(rows, currentRoomId);
+                const updates = rows.map((r, i) => ({ row: r, land: lands[i] })).filter(x => !x.row.land_id);
+                const results = await Promise.all(updates.map(x =>
+                    supabaseClient.from('team_lands').update({ land_id: x.land.id, land_name: x.land.name }).eq('id', x.row.id)
+                ));
+                const failed = results.filter(r => r.error);
+                if (failed.length > 0) console.error("土地の保存エラー:", failed);
+
+                await currentChannel.send({ type: 'broadcast', event: 'lands_revealed', payload: {} });
+                await fetchJoinedTeams();
+                alert(failed.length > 0
+                    ? `⚠️ ${failed.length}チームの土地を保存できませんでした。もう一度押してください。`
+                    : "✅ 全チームに土地を発表しました！");
             });
 
             // 🟢 2. イベント一斉送信処理
