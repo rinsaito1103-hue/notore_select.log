@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS team_lands (
   room_id    text NOT NULL,
   team_name  text NOT NULL,
   log_group  text,
-  land_id    text NOT NULL,
+  land_id    text,
   land_name  text,
   created_at timestamptz DEFAULT now(),
   UNIQUE (room_id, log_group, team_name)
@@ -46,3 +46,8 @@ DROP POLICY IF EXISTS "anon insert team_lands" ON team_lands;
 CREATE POLICY "anon insert team_lands" ON team_lands FOR INSERT TO anon WITH CHECK (true);
 DROP POLICY IF EXISTS "anon select team_lands" ON team_lands;
 CREATE POLICY "anon select team_lands" ON team_lands FOR SELECT TO anon USING (true);
+
+-- 同時接続対策の版（2026-11-06）で必要な追加設定：参加登録のあとに土地を書き込むため
+ALTER TABLE team_lands ALTER COLUMN land_id DROP NOT NULL;
+DROP POLICY IF EXISTS "anon update team_lands" ON team_lands;
+CREATE POLICY "anon update team_lands" ON team_lands FOR UPDATE TO anon USING (true) WITH CHECK (true);

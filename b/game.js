@@ -652,56 +652,72 @@ function saveTeamMembers(roomId, teamName, members) {
 
 // --- 4. 画面遷移：タイトル ➔ セットアップ ---
 // 🧪 実験用：同じルームIDのチーム数を数えて、6種類の土地が偏らないように自動で割り当てる
+//   参加した順番（Supabaseに登録された順）に並べて、全チームの土地を次の規則で順に決める
 //   ① 自分の群（ログあり/なし）の中で、まだ割り当てが最も少ない土地
 //   ② それでも同数なら、もう一方の群で多く配られている土地（もう一方の群と構成をそろえる）
-//   ③ それでも同数ならランダム
-//   → 両群それぞれで6種類が均等に配られ、両群の土地構成もそろう
+//   ③ それでも同数なら、ルームIDから決まる順番（ルームごとにランダム）で先の土地
+//   → どの端末で計算しても同じ結果になるので、複数のチームが同時にスタートしても偏らない
+function seededLandOrder(seedText) {
+    let h = 2166136261;
+    for (const ch of seedText) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
+    const rand = () => { h = (Math.imul(h, 1103515245) + 12345) >>> 0; return h / 4294967296; };
+    const order = LAND_MASTER.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+    }
+    return order;
+}
+
+function computeLandAllocation(rows, roomId) {
+    const order = seededLandOrder(roomId);
+    const counts = {};
+    const result = [];
+    rows.forEach(r => {
+        const group = r.log_group || "";
+        if (!counts[group]) { counts[group] = {}; LAND_MASTER.forEach(l => { counts[group][l.id] = 0; }); }
+        const mine = counts[group];
+        const other = {};
+        LAND_MASTER.forEach(l => {
+            other[l.id] = Object.keys(counts).filter(k => k !== group).reduce((sum, k) => sum + counts[k][l.id], 0);
+        });
+        let candidates = order.slice();
+        const minMine = Math.min(...candidates.map(l => mine[l.id]));
+        candidates = candidates.filter(l => mine[l.id] === minMine);
+        const maxOther = Math.max(...candidates.map(l => other[l.id]));
+        candidates = candidates.filter(l => other[l.id] === maxOther);
+        const land = candidates[0];
+        mine[land.id]++;
+        result.push(land);
+    });
+    return result;
+}
+
 async function assignBalancedLand(roomId, teamName) {
-    const randomLand = () => LAND_MASTER[Math.floor(Math.random() * LAND_MASTER.length)];
-    const findLand = id => LAND_MASTER.find(l => l.id === id);
     try {
-        const { data, error } = await supabaseClient.from('team_lands')
-            .select('team_name, log_group, land_id').eq('room_id', roomId);
-        if (error) throw error;
-
-        // 同じチーム名ですでに割り当て済みなら、同じ土地を使う（入力し直し・別の端末から入った場合）
-        const mine = data.find(r => r.team_name === teamName && r.log_group === LOG_GROUP);
-        if (mine && findLand(mine.land_id)) return findLand(mine.land_id);
-
-        const countBy = rows => {
-            const c = {};
-            LAND_MASTER.forEach(l => { c[l.id] = 0; });
-            rows.forEach(r => { if (c[r.land_id] !== undefined) c[r.land_id]++; });
-            return c;
-        };
-        const groupCount = countBy(data.filter(r => r.log_group === LOG_GROUP));
-        const otherCount = countBy(data.filter(r => r.log_group !== LOG_GROUP));
-
-        let candidates = LAND_MASTER.slice();
-        const minGroup = Math.min(...candidates.map(l => groupCount[l.id]));
-        candidates = candidates.filter(l => groupCount[l.id] === minGroup);
-        const maxOther = Math.max(...candidates.map(l => otherCount[l.id]));
-        candidates = candidates.filter(l => otherCount[l.id] === maxOther);
-        const land = candidates[Math.floor(Math.random() * candidates.length)];
-
+        // ① 参加を登録する（同じチーム名ですでに登録済みなら、その登録をそのまま使う）
         const ins = await supabaseClient.from('team_lands').insert([{
-            room_id: roomId, team_name: teamName, log_group: LOG_GROUP,
-            land_id: land.id, land_name: land.name
+            room_id: roomId, team_name: teamName, log_group: LOG_GROUP
         }]);
-        if (ins.error) {
-            // 23505 = 同じチーム名がほぼ同時に登録された → 先に登録された土地を使う
-            if (ins.error.code === '23505') {
-                const again = await supabaseClient.from('team_lands').select('land_id')
-                    .eq('room_id', roomId).eq('log_group', LOG_GROUP).eq('team_name', teamName);
-                if (!again.error && again.data.length > 0 && findLand(again.data[0].land_id)) return findLand(again.data[0].land_id);
-            }
-            console.error("土地の割り当て保存エラー:", ins.error);
-        }
+        if (ins.error && ins.error.code !== '23505') throw ins.error;
+
+        // ② ルームの全チームを参加順に並べ、全員分の土地を同じ規則で計算する
+        const { data, error } = await supabaseClient.from('team_lands')
+            .select('id, team_name, log_group').eq('room_id', roomId).order('id', { ascending: true });
+        if (error) throw error;
+        const myIndex = data.findIndex(r => r.team_name === teamName && r.log_group === LOG_GROUP);
+        if (myIndex < 0) throw new Error("参加登録が見つかりません");
+        const land = computeLandAllocation(data, roomId)[myIndex];
+
+        // ③ 分析用に、決まった土地を記録しておく（失敗してもゲームは続ける）
+        supabaseClient.from('team_lands').update({ land_id: land.id, land_name: land.name })
+            .eq('id', data[myIndex].id)
+            .then(res => { if (res.error) console.error("土地の記録エラー:", res.error); });
         return land;
     } catch (err) {
         // 通信できない・表がない場合でもゲームは続けられるよう、ランダムで割り当てる
         console.error("土地の自動割り当てに失敗したため、ランダムで決めます:", err);
-        return randomLand();
+        return LAND_MASTER[Math.floor(Math.random() * LAND_MASTER.length)];
     }
 }
 
