@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS team_members (
   UNIQUE (room_id, team_name, student_id)
 );
 
+-- すでに team_members 表がある場合にも群の列を追加する
+ALTER TABLE team_members ADD COLUMN IF NOT EXISTS log_group text;
+
 -- ゲーム（匿名キー）から追加・読み取りできるようにする
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon insert team_members" ON team_members;
@@ -51,3 +54,6 @@ CREATE POLICY "anon select team_lands" ON team_lands FOR SELECT TO anon USING (t
 ALTER TABLE team_lands ALTER COLUMN land_id DROP NOT NULL;
 DROP POLICY IF EXISTS "anon update team_lands" ON team_lands;
 CREATE POLICY "anon update team_lands" ON team_lands FOR UPDATE TO anon USING (true) WITH CHECK (true);
+
+-- Supabase に新しい列をすぐ認識させる
+NOTIFY pgrst, 'reload schema';
