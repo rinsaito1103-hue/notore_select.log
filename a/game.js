@@ -651,15 +651,75 @@ function saveTeamMembers(roomId, teamName, members) {
 }
 
 // --- 4. 画面遷移：タイトル ➔ セットアップ ---
-function startGame(config) {
+// 🧪 実験用：同じルームIDのチーム数を数えて、6種類の土地が偏らないように自動で割り当てる
+//   ① 自分の群（ログあり/なし）の中で、まだ割り当てが最も少ない土地
+//   ② それでも同数なら、もう一方の群で多く配られている土地（もう一方の群と構成をそろえる）
+//   ③ それでも同数ならランダム
+//   → 両群それぞれで6種類が均等に配られ、両群の土地構成もそろう
+async function assignBalancedLand(roomId, teamName) {
+    const randomLand = () => LAND_MASTER[Math.floor(Math.random() * LAND_MASTER.length)];
+    const findLand = id => LAND_MASTER.find(l => l.id === id);
+    try {
+        const { data, error } = await supabaseClient.from('team_lands')
+            .select('team_name, log_group, land_id').eq('room_id', roomId);
+        if (error) throw error;
+
+        // 同じチーム名ですでに割り当て済みなら、同じ土地を使う（入力し直し・別の端末から入った場合）
+        const mine = data.find(r => r.team_name === teamName && r.log_group === LOG_GROUP);
+        if (mine && findLand(mine.land_id)) return findLand(mine.land_id);
+
+        const countBy = rows => {
+            const c = {};
+            LAND_MASTER.forEach(l => { c[l.id] = 0; });
+            rows.forEach(r => { if (c[r.land_id] !== undefined) c[r.land_id]++; });
+            return c;
+        };
+        const groupCount = countBy(data.filter(r => r.log_group === LOG_GROUP));
+        const otherCount = countBy(data.filter(r => r.log_group !== LOG_GROUP));
+
+        let candidates = LAND_MASTER.slice();
+        const minGroup = Math.min(...candidates.map(l => groupCount[l.id]));
+        candidates = candidates.filter(l => groupCount[l.id] === minGroup);
+        const maxOther = Math.max(...candidates.map(l => otherCount[l.id]));
+        candidates = candidates.filter(l => otherCount[l.id] === maxOther);
+        const land = candidates[Math.floor(Math.random() * candidates.length)];
+
+        const ins = await supabaseClient.from('team_lands').insert([{
+            room_id: roomId, team_name: teamName, log_group: LOG_GROUP,
+            land_id: land.id, land_name: land.name
+        }]);
+        if (ins.error) {
+            // 23505 = 同じチーム名がほぼ同時に登録された → 先に登録された土地を使う
+            if (ins.error.code === '23505') {
+                const again = await supabaseClient.from('team_lands').select('land_id')
+                    .eq('room_id', roomId).eq('log_group', LOG_GROUP).eq('team_name', teamName);
+                if (!again.error && again.data.length > 0 && findLand(again.data[0].land_id)) return findLand(again.data[0].land_id);
+            }
+            console.error("土地の割り当て保存エラー:", ins.error);
+        }
+        return land;
+    } catch (err) {
+        // 通信できない・表がない場合でもゲームは続けられるよう、ランダムで割り当てる
+        console.error("土地の自動割り当てに失敗したため、ランダムで決めます:", err);
+        return randomLand();
+    }
+}
+
+async function startGame(config) {
     const roomId = document.getElementById("room-id-input").value.trim();
     const name = nameInput.value.trim();
     if (!roomId) { alert("ルームIDを入力してください！"); return; }
     if (!name) { alert("チーム名を入力してください！"); return; }
-    const landNo = parseInt(document.getElementById("land-no-select").value, 10);
-    if (!(landNo >= 1 && landNo <= LAND_MASTER.length)) { alert("先生から配られた土地番号を選択してください！"); return; }
     const teamResult = collectTeamMembers();
     if (teamResult.error) { alert(teamResult.error); return; }
+
+    // 🌟 土地を自動で割り当てる（通信の間はボタンを押せないようにする）
+    const startBtnLabel = startGameBtn.textContent;
+    startGameBtn.disabled = true;
+    startGameBtn.textContent = "🎲 土地を抽選中…";
+    const assignedLand = await assignBalancedLand(roomId, name);
+    startGameBtn.disabled = false;
+    startGameBtn.textContent = startBtnLabel;
     
     gameState.roomId = roomId; // 🌟ルームIDを保存
     gameState.playerName = name; // 🌟「チーム名」として使う（ランキングやデータ保存の識別子）
@@ -677,8 +737,8 @@ function startGame(config) {
     gameState.money = config.startMoney;
     gameState.history[0].money = config.startMoney;
 
-    // 🌟 実験用：土地はランダムではなく、配られた土地番号で決める（1=優良, 2=都市, 3=通常, 4=中山間, 5=耕作放棄, 6=大規模）
-    gameState.currentLand = LAND_MASTER[landNo - 1];
+    // 🌟 実験用：ルーム内で偏りが出ないように自動で割り当てた土地（土地公開画面で発表される）
+    gameState.currentLand = assignedLand;
     const land = gameState.currentLand;
     
     // 農地の枚数分だけ、土壌ダメージのカウンターを用意する（連作障害用）

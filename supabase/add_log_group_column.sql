@@ -29,3 +29,20 @@ ALTER TABLE yearly_logs ADD COLUMN IF NOT EXISTS land_id   text;
 ALTER TABLE yearly_logs ADD COLUMN IF NOT EXISTS land_name text;
 ALTER TABLE scores      ADD COLUMN IF NOT EXISTS land_id   text;
 ALTER TABLE scores      ADD COLUMN IF NOT EXISTS land_name text;
+
+-- 土地の自動割り当て表（同じルームのチーム数を数えて、6種類の土地を偏りなく配るために使う）
+CREATE TABLE IF NOT EXISTS team_lands (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  room_id    text NOT NULL,
+  team_name  text NOT NULL,
+  log_group  text,
+  land_id    text NOT NULL,
+  land_name  text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (room_id, log_group, team_name)
+);
+ALTER TABLE team_lands ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon insert team_lands" ON team_lands;
+CREATE POLICY "anon insert team_lands" ON team_lands FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "anon select team_lands" ON team_lands;
+CREATE POLICY "anon select team_lands" ON team_lands FOR SELECT TO anon USING (true);
