@@ -303,6 +303,11 @@
                 return String(text ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
             }
 
+            // ツールチップ用：見出しの下にチーム名を「・」付きの箇条書きで1行ずつ並べる
+            function tooltipList(heading, names, emptyText) {
+                return [heading, ...(names.length ? names.map(n => `・${n}`) : [emptyText])].join("\n");
+            }
+
             // 群ごとの枠（6種類の土地タイル＋発表待ちのチーム）を描く
             function renderGroupBox(group, rows) {
                 const box = document.getElementById(`group-box-${group}`);
@@ -310,14 +315,14 @@
                 const tiles = LAND_MASTER.map((land, i) => {
                     const teams = rows.filter(r => r.land_id === land.id).map(r => r.team_name);
                     const names = teams.map(escapeHtml).join("、");
-                    return `<div class="land-tile${teams.length ? " on" : ""}" title="${escapeHtml(land.name)}: ${teams.length ? escapeHtml(teams.join("、")) : "まだ割り振りなし"}">
+                    return `<div class="land-tile${teams.length ? " on" : ""}" title="${escapeHtml(tooltipList(`${land.name}（${teams.length}チーム）`, teams, "まだ割り振りなし"))}">
                         <div class="lt-top"><span><span class="lt-num">${i + 1}</span>${land.name}</span><span class="lt-count">${teams.length}</span></div>
                         <div class="lt-teams">${names || "―"}</div>
                     </div>`;
                 }).join("");
                 const pending = rows.filter(r => !r.land_id).map(r => r.team_name);
                 const pendingHtml = pending.length
-                    ? `<div class="pending-line" title="${escapeHtml(pending.join("、"))}">⏳ 発表待ち ${pending.length}チーム: ${pending.map(escapeHtml).join("、")}</div>`
+                    ? `<div class="pending-line" title="${escapeHtml(tooltipList(`発表待ち（${pending.length}チーム）`, pending, ""))}">⏳ 発表待ち ${pending.length}チーム: ${pending.map(escapeHtml).join("、")}</div>`
                     : `<div class="pending-line none">⏳ 発表待ちのチームはありません</div>`;
                 box.innerHTML = `<div class="group-title"><span>${icon} ${GROUP_LABEL[group]}群</span><span class="count"><b>${rows.length}</b> チーム</span></div>
                     <div class="land-grid">${tiles}</div>${pendingHtml}`;
