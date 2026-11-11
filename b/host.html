@@ -49,15 +49,16 @@
         /* 🟢 メイン画面（左右分割） */
         .admin-main {
             display: grid;
-            grid-template-columns: 380px 1fr; /* 左: 操作・ランキング、右: グラフ */
+            grid-template-columns: 360px 1fr; /* 左: イベント・ランキング、右: 土地・グラフ */
             gap: 15px;
-            flex-grow: 1; 
-            overflow: hidden; 
+            flex-grow: 1;
+            min-height: 0;
+            overflow: hidden;
         }
 
-        /* 🟢 左カラム */
-        .left-col { display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
-        .panel { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        /* 🟢 左カラム（画面が低いときはカラムごとスクロールして、下が切れないようにする） */
+        .left-col { display: flex; flex-direction: column; gap: 15px; min-height: 0; overflow-y: auto; }
+        .panel { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-shrink: 0; }
         .panel h3 { margin: 0 0 10px 0; font-size: 16px; color: #1e40af; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
         
         .control-group { margin-bottom: 12px; }
@@ -65,16 +66,48 @@
         .control-group select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 14px; }
 
         /* ランキング表 */
-        .ranking-panel { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .ranking-panel { flex: 1 0 220px; display: flex; flex-direction: column; overflow: hidden; }
         .table-wrap { flex-grow: 1; overflow-y: auto; margin-top: 5px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th { background: #f8fafc; padding: 8px; text-align: left; position: sticky; top: 0; box-shadow: 0 1px 0 #cbd5e1; color: #64748b; }
         td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
         .rank-icon { font-size: 16px; font-weight: bold; }
 
-        /* 🟢 右カラム */
-        .right-col { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
-        .chart-wrap { flex-grow: 1; position: relative; width: 100%; }
+        /* 🟢 右カラム（上: 土地配信、下: グラフ） */
+        .right-col { display: flex; flex-direction: column; gap: 15px; min-height: 0; overflow-y: auto; }
+        .chart-panel { flex: 1 0 200px; display: flex; flex-direction: column; overflow: hidden; }
+        .chart-wrap { flex-grow: 1; position: relative; width: 100%; min-height: 0; }
+
+        /* 🎲 土地配信パネル */
+        .land-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+        .panel .land-head h3 { border: none; margin: 0; padding: 0; }
+        .land-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex-grow: 1; }
+        .stat { background: #f1f5f9; border-radius: 6px; padding: 4px 10px; font-size: 13px; color: #475569; }
+        .stat b { font-size: 18px; color: #1e293b; margin: 0 2px; }
+        .stat.total { background: #1e40af; color: #dbeafe; }
+        .stat.total b { color: #fff; }
+        .stat.wait b { color: #b45309; }
+        .land-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .group-box { border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px 10px 10px; }
+        .group-box.log { border-color: #93c5fd; background: #f8fbff; }
+        .group-box.nolog { border-color: #fdba74; background: #fffaf5; }
+        .group-title { display: flex; justify-content: space-between; align-items: baseline; font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+        .group-box.log .group-title { color: #1d4ed8; }
+        .group-box.nolog .group-title { color: #c2410c; }
+        .group-title .count { font-size: 13px; color: #475569; }
+        .group-title .count b { font-size: 18px; color: #1e293b; }
+        .land-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .land-tile { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 7px; min-width: 0; opacity: 0.55; }
+        .land-tile.on { opacity: 1; border-color: #22c55e; background: #f0fdf4; }
+        .land-tile .lt-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; color: #334155; }
+        .land-tile .lt-num { display: inline-block; width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 50%; background: #64748b; color: #fff; font-size: 10px; margin-right: 4px; }
+        .land-tile.on .lt-num { background: #16a34a; }
+        .land-tile .lt-count { font-size: 15px; color: #94a3b8; }
+        .land-tile.on .lt-count { color: #15803d; }
+        .land-tile .lt-teams { font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 14px; }
+        .pending-line { font-size: 11px; color: #b45309; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pending-line.none { color: #94a3b8; }
+
     </style>
 </head>
 <body>
@@ -94,19 +127,6 @@
         <main class="admin-main">
             
             <div class="left-col">
-                <div class="panel">
-                    <h3>🎲 土地の一斉発表</h3>
-                    <p id="land-join-summary" style="margin: 0 0 8px; font-size: 13px; color: #475569;">ルームに接続すると、参加チームが表示されます</p>
-                    <div class="table-wrap" style="max-height: 160px; margin-bottom: 10px;">
-                        <table>
-                            <thead><tr><th>受付</th><th>班名</th><th>群</th><th>土地</th></tr></thead>
-                            <tbody id="land-join-tbody"></tbody>
-                        </table>
-                    </div>
-                    <button id="reveal-lands-btn" class="btn btn-blue" style="width: 100%;">🎲 土地を一斉発表する</button>
-                    <p style="margin: 6px 0 0; font-size: 11px; color: #64748b;">全チームがそろってから押してください。あとから来たチームがいたら、もう一度押すとそのチームにも配られます（すでに配った土地は変わりません）。</p>
-                </div>
-
                 <div class="panel">
                     <h3>📢 イベント一斉配信</h3>
                     <div class="control-group">
@@ -153,9 +173,29 @@
             </div>
 
             <div class="right-col">
-                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1e40af;">📈 資金推移チャート</h3>
-                <div class="chart-wrap">
-                    <canvas id="trend-chart"></canvas>
+                <div class="panel">
+                    <div class="land-head">
+                        <h3>🎲 土地の配信状況</h3>
+                        <div class="land-stats">
+                            <span class="stat total">合計<b id="stat-total">0</b>チーム</span>
+                            <span class="stat">ログあり<b id="stat-log">0</b></span>
+                            <span class="stat">ログなし<b id="stat-nolog">0</b></span>
+                            <span class="stat wait">発表待ち<b id="stat-wait">0</b></span>
+                            <span id="land-join-summary" style="font-size: 12px; color: #64748b;">ルームに接続すると、参加チームが表示されます</span>
+                        </div>
+                        <button id="reveal-lands-btn" class="btn btn-blue" title="全チームがそろってから押してください。あとから来たチームがいたら、もう一度押すとそのチームにも配られます（すでに配った土地は変わりません）。">🎲 土地を一斉発表する</button>
+                    </div>
+                    <div class="land-groups">
+                        <div class="group-box log" id="group-box-log"></div>
+                        <div class="group-box nolog" id="group-box-nolog"></div>
+                    </div>
+                </div>
+
+                <div class="panel chart-panel">
+                    <h3>📈 資金推移チャート</h3>
+                    <div class="chart-wrap">
+                        <canvas id="trend-chart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -259,18 +299,53 @@
                 return data || [];
             }
 
+            function escapeHtml(text) {
+                return String(text ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+            }
+
+            // 群ごとの枠（6種類の土地タイル＋発表待ちのチーム）を描く
+            function renderGroupBox(group, rows) {
+                const box = document.getElementById(`group-box-${group}`);
+                const icon = group === "log" ? "📊" : "📄";
+                const tiles = LAND_MASTER.map((land, i) => {
+                    const teams = rows.filter(r => r.land_id === land.id).map(r => r.team_name);
+                    const names = teams.map(escapeHtml).join("、");
+                    return `<div class="land-tile${teams.length ? " on" : ""}" title="${escapeHtml(land.name)}: ${teams.length ? escapeHtml(teams.join("、")) : "まだ割り振りなし"}">
+                        <div class="lt-top"><span><span class="lt-num">${i + 1}</span>${land.name}</span><span class="lt-count">${teams.length}</span></div>
+                        <div class="lt-teams">${names || "―"}</div>
+                    </div>`;
+                }).join("");
+                const pending = rows.filter(r => !r.land_id).map(r => r.team_name);
+                const pendingHtml = pending.length
+                    ? `<div class="pending-line" title="${escapeHtml(pending.join("、"))}">⏳ 発表待ち ${pending.length}チーム: ${pending.map(escapeHtml).join("、")}</div>`
+                    : `<div class="pending-line none">⏳ 発表待ちのチームはありません</div>`;
+                box.innerHTML = `<div class="group-title"><span>${icon} ${GROUP_LABEL[group]}群</span><span class="count"><b>${rows.length}</b> チーム</span></div>
+                    <div class="land-grid">${tiles}</div>${pendingHtml}`;
+            }
+
+            function renderLandStatus(rows) {
+                const logRows = rows.filter(r => r.log_group === "log");
+                const nologRows = rows.filter(r => r.log_group === "nolog");
+                const others = rows.filter(r => r.log_group !== "log" && r.log_group !== "nolog");
+                document.getElementById("stat-total").textContent = rows.length;
+                document.getElementById("stat-log").textContent = logRows.length;
+                document.getElementById("stat-nolog").textContent = nologRows.length;
+                document.getElementById("stat-wait").textContent = rows.filter(r => !r.land_id).length;
+                document.getElementById("land-join-summary").textContent = others.length
+                    ? `※群が不明なチーム ${others.length}（${others.map(r => r.team_name).join("、")}）`
+                    : "";
+                renderGroupBox("log", logRows);
+                renderGroupBox("nolog", nologRows);
+            }
+
             async function fetchJoinedTeams() {
                 if (!currentRoomId) return;
                 const rows = await loadJoinedTeams();
                 if (!rows) return;
-                const tbody = document.getElementById("land-join-tbody");
-                tbody.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.team_name}</td><td>${GROUP_LABEL[r.log_group] || r.log_group || '-'}</td><td>${r.land_name || '<span style="color:#94a3b8">未発表</span>'}</td></tr>`).join("");
-                const nLog = rows.filter(r => r.log_group === "log").length;
-                const nNolog = rows.filter(r => r.log_group === "nolog").length;
-                const waiting = rows.filter(r => !r.land_id).length;
-                document.getElementById("land-join-summary").textContent =
-                    `参加 ${rows.length}チーム（ログあり ${nLog}・ログなし ${nNolog}）／ 発表待ち ${waiting}チーム`;
+                renderLandStatus(rows);
             }
+
+            renderLandStatus([]);
 
             document.getElementById("reveal-lands-btn").addEventListener("click", async () => {
                 if (!currentChannel || !currentRoomId) { alert("先に接続してください"); return; }
@@ -278,7 +353,7 @@
                 if (!rows) { alert("参加チームを取得できませんでした。Supabaseの設定を確認してください。"); return; }
                 const pending = rows.filter(r => !r.land_id);
                 if (rows.length === 0) { alert("まだ参加しているチームがありません。"); return; }
-                if (!confirm(`参加 ${rows.length}チームのうち、まだ土地が決まっていない ${pending.length}チームに土地を発表します。よろしいですか？`)) return;
+                if (!confirm(`参加 ${rows.length}チームのうち、まだ土地が決まっていない ${pending.length}チームに土地を発表します。よろしいですか？\n\n※全チームがそろってから押してください。あとから来たチームには、もう一度押せば配られます（すでに配った土地は変わりません）。`)) return;
 
                 const lands = computeLandAllocation(rows, currentRoomId);
                 const updates = rows.map((r, i) => ({ row: r, land: lands[i] })).filter(x => !x.row.land_id);
