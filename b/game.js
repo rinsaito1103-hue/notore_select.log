@@ -184,7 +184,7 @@ function generateLandStrategyUI() {
                             <option value="strawberry" ${savedCropId === 'strawberry' ? 'selected' : ''}>🍓 A:いちご</option>
                             <option value="japanese_parsley" ${savedCropId === 'japanese_parsley' ? 'selected' : ''}>🌿 A:せり</option>
                             <option value="corn" ${savedCropId === 'corn' ? 'selected' : ''}>🌽 B:とうもろこし</option>
-                            <option value="daikon" ${savedCropId === 'daikon' ? 'selected' : ''}>🥕 B:大根</option>
+                            <option value="daikon" ${savedCropId === 'daikon' ? 'selected' : ''}>🥕 B:人参</option>
                             <option value="cabbage" ${savedCropId === 'cabbage' ? 'selected' : ''}>🥬 C:キャベツ</option>
                         </select>
                         <label style="margin-top: 5px;">🏪 出荷・販売先:</label>
@@ -194,7 +194,7 @@ function generateLandStrategyUI() {
                             <option value="direct_store" ${savedMarketId === 'direct_store' ? 'selected' : ''}>直売所 [数量くじ]</option>
                             <option value="restaurant" ${savedMarketId === 'restaurant' ? 'selected' : ''}>レストラン [上限200kg]</option>
                             <option value="natural_store" ${savedMarketId === 'natural_store' ? 'selected' : ''}>自然派ストア [有機必須]</option>
-                            <option value="processed_food" ${savedMarketId === 'processed_food' ? 'selected' : ''}>加工工場 [大根・ｺｰﾝ・せり]</option>
+                            <option value="processed_food" ${savedMarketId === 'processed_food' ? 'selected' : ''}>加工工場 [人参・ｺｰﾝ・せり]</option>
                         </select>
                     </div>
                     <div class="land-strategy-card-right">
