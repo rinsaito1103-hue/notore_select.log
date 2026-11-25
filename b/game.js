@@ -1568,8 +1568,29 @@ function renderFinalSummaryChart() {
 // ==========================================================================
 
 // 先生からのイベントを受信するチャンネルに接続する
+// 📡 管理者画面に「いまどの段階か（イベント受信待ちなど）」を知らせる（Realtime Presence）
+let roomChannel = null;
+let roomChannelReady = false;
+
+function reportStatus() {
+    if (!roomChannel || !roomChannelReady) return;
+    roomChannel.track({
+        team: gameState.playerName || "",
+        group: LOG_GROUP,
+        year: gameState.year,
+        phase: gamePhase,
+        received: !!(receivedGlobalEventId && receivedLocalEventId),
+        pending: !!pendingNextEvents
+    }).catch(err => console.warn("状態を管理者画面に送れませんでした", err));
+}
+
 function subscribeRoomEvents(roomId) {
-    const channel = supabaseClient.channel(`room-${roomId}`);
+    if (roomChannel) return; // 二重に接続しない
+    const channel = supabaseClient.channel(`room-${roomId}`, {
+        config: { presence: { enabled: true, key: `${LOG_GROUP}:${gameState.playerName || Math.random().toString(36).slice(2)}` } }
+    });
+    roomChannel = channel;
+    channel.on('presence', { event: 'sync' }, () => {}); // 状態の共有（Presence）を有効にするため
     // 🌟 先生が「土地を一斉発表」を押したら、自分の土地を確認する
     channel.on('broadcast', { event: 'lands_revealed' }, () => { checkMyLand(); });
     channel.on('broadcast', { event: 'yearly_events' }, payload => {
@@ -1597,7 +1618,9 @@ function subscribeRoomEvents(roomId) {
         receivedLocalEventId = localId;
         checkAndEnableEndYearBtn();
         saveProgress();
-    }).subscribe();
+    }).subscribe(status => {
+        if (status === 'SUBSCRIBED') { roomChannelReady = true; reportStatus(); }
+    });
 }
 
 function saveProgress() {
@@ -1610,6 +1633,7 @@ function saveProgress() {
     } catch (e) {
         console.warn("進行状況を保存できませんでした", e);
     }
+    reportStatus(); // 段階が変わるたびに管理者画面へも知らせる
 }
 
 function clearProgress() {
