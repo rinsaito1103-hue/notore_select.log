@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="lands.js"></script>
+    <script src="events.js"></script>
     <style>
         /* =========================================
            管理者用ダッシュボード 1画面レイアウト
@@ -107,6 +108,31 @@
         .pending-line { font-size: 11px; color: #b45309; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pending-line.none { color: #94a3b8; }
 
+        /* 📜 イベントの効果プレビュー＆配信履歴 */
+        .effect-preview { font-size: 12px; color: #475569; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 4px; padding: 5px 8px; margin-top: 5px; line-height: 1.5; }
+        .effect-preview.global { border-left-color: #f59e0b; }
+        .effect-preview.local { border-left-color: #22c55e; }
+        .history-panel h3 { display: flex; justify-content: space-between; align-items: baseline; }
+        .history-panel h3 .clear-link { font-size: 11px; font-weight: normal; color: #94a3b8; cursor: pointer; text-decoration: underline; }
+        .history-panel h3 .clear-link:hover { color: #ef4444; }
+        .history-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .history-empty { text-align: center; color: #94a3b8; font-size: 13px; padding: 12px 0; }
+        .history-item { border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 9px; background: #fff; }
+        .history-item.latest { border-color: #93c5fd; background: #f8fbff; }
+        .hi-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+        .hi-top b { color: #1e40af; font-size: 13px; }
+        .hi-year { background: #1e40af; color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: bold; }
+        .hi-row { font-size: 12px; margin-top: 3px; line-height: 1.5; }
+        .hi-row .hi-kind { display: inline-block; font-size: 10px; font-weight: bold; border-radius: 3px; padding: 0 5px; margin-right: 4px; color: #fff; }
+        .hi-row .hi-kind.global { background: #f59e0b; }
+        .hi-row .hi-kind.local { background: #22c55e; }
+        .hi-row .hi-name { font-weight: bold; color: #1e293b; }
+        .hi-row .hi-desc { display: block; color: #64748b; font-size: 11px; padding-left: 2px; }
+        .hi-teams { margin-top: 5px; font-size: 11px; color: #475569; }
+        .hi-teams summary { cursor: pointer; color: #3b82f6; }
+        .hi-teams ul { margin: 4px 0 0; padding-left: 16px; }
+        .hi-teams li { margin: 1px 0; }
+
     </style>
 </head>
 <body>
@@ -139,6 +165,7 @@
                             <option value="poor_crop">📈 全国的な凶作（価格急高騰）</option>
                             <option value="fuel_surge">💸 燃料・資材コスト高騰（費用増加）</option>
                         </select>
+                        <div id="global-effect" class="effect-preview global"></div>
                     </div>
                     <div class="control-group">
                         <label>📍 局地環境イベント (収量変動)</label>
@@ -152,8 +179,16 @@
                             <option value="animal_damage">🐗 獣害（全滅・ハウス破壊）</option>
                             <option value="good_weather">☀️ 奇跡の好天候（収穫量2倍）</option>
                         </select>
+                        <div id="local-effect" class="effect-preview local"></div>
                     </div>
                     <button id="broadcast-btn" class="btn btn-red" style="width: 100%;">🚀 イベントを全班に送信する</button>
+                </div>
+
+                <div class="panel history-panel">
+                    <h3><span>📜 配信したイベントの履歴</span><span class="clear-link" id="clear-history-btn" title="このルームの配信履歴を消します（このパソコンに保存された記録のみ）">履歴を消す</span></h3>
+                    <div class="history-list" id="history-list">
+                        <div class="history-empty">まだイベントを配信していません</div>
+                    </div>
                 </div>
 
                 <div class="panel ranking-panel">
@@ -242,6 +277,8 @@
                     }).subscribe();
 
                 // 初回データ取得
+                latestLogs = []; latestMaxYear = 0;
+                loadHistory();
                 fetchDashboardData();
                 fetchJoinedTeams();
                 if (joinTimer) clearInterval(joinTimer);
@@ -372,6 +409,86 @@
                     : "✅ 全チームに土地を発表しました！");
             });
 
+            // 📜 イベントの効果表示と配信履歴 ---------------------------------------
+            //   配信した内容はこのパソコン（ブラウザ）にルームごとに保存する
+            //   各班が実際に受け取ったイベントは yearly_logs（決算ログ）から表示する
+            const GLOBAL_MAP = Object.fromEntries(GLOBAL_EVENTS.map(e => [e.id, e]));
+            const LOCAL_MAP = Object.fromEntries(LOCAL_EVENTS.map(e => [e.id, e]));
+            const RANDOM_TEXT = {
+                random: "全班共通で、全体イベントのどれか1つが抽選されます（抽選結果は送信時に決まります）",
+                random_per_team: "班ごとに局地イベントがランダムで決まります（班ごとの結果は決算後に下に表示されます）"
+            };
+            let broadcastHistory = [];
+            let latestLogs = []; // { player_name, year, global_event, local_event }
+            let latestMaxYear = 0;
+
+            function optionLabel(select, value) {
+                const opt = Array.from(select.options).find(o => o.value === value);
+                return opt ? opt.text : value;
+            }
+
+            function effectText(map, id) {
+                if (RANDOM_TEXT[id]) return RANDOM_TEXT[id];
+                return map[id] ? map[id].desc : "";
+            }
+
+            function updateEffectPreview() {
+                const g = document.getElementById("global-select").value;
+                const l = document.getElementById("local-select").value;
+                document.getElementById("global-effect").textContent = "効果：" + effectText(GLOBAL_MAP, g);
+                document.getElementById("local-effect").textContent = "効果：" + effectText(LOCAL_MAP, l);
+            }
+            document.getElementById("global-select").addEventListener("change", updateEffectPreview);
+            document.getElementById("local-select").addEventListener("change", updateEffectPreview);
+            updateEffectPreview();
+
+            const historyKey = roomId => `notore_host_event_history_${roomId}`;
+
+            function loadHistory() {
+                try { broadcastHistory = JSON.parse(localStorage.getItem(historyKey(currentRoomId)) || "[]"); }
+                catch (e) { broadcastHistory = []; }
+                renderHistory();
+            }
+
+            function saveHistory() {
+                try { localStorage.setItem(historyKey(currentRoomId), JSON.stringify(broadcastHistory)); }
+                catch (e) { console.warn("配信履歴を保存できませんでした", e); }
+            }
+
+            // その年度の決算ログから、班ごとに実際に発生したイベントを並べる
+            function teamResultsHtml(year) {
+                const logs = latestLogs.filter(l => l.year === year);
+                if (logs.length === 0) return `<div class="hi-teams" style="color:#94a3b8;">各班の決算がまだ届いていません</div>`;
+                const items = logs.map(l => `<li><b>${escapeHtml(l.player_name)}</b>：${escapeHtml(l.global_event || "-")} ／ ${escapeHtml(l.local_event || "-")}</li>`).join("");
+                return `<details class="hi-teams"><summary>各班で実際に発生したイベント（決算済み ${logs.length}班）</summary><ul>${items}</ul></details>`;
+            }
+
+            function renderHistory() {
+                const list = document.getElementById("history-list");
+                if (broadcastHistory.length === 0) {
+                    list.innerHTML = `<div class="history-empty">まだイベントを配信していません</div>`;
+                    return;
+                }
+                // 新しい配信を上に表示する
+                list.innerHTML = broadcastHistory.map((h, i) => ({ h, no: i + 1 })).reverse().map(({ h, no }, idx) => {
+                    const time = new Date(h.sentAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+                    return `<div class="history-item${idx === 0 ? " latest" : ""}">
+                        <div class="hi-top"><span><b>第${no}回</b>　${time} 配信</span><span class="hi-year" title="配信した時点の決算状況から推定した年度です">第${h.year}年向け</span></div>
+                        <div class="hi-row"><span class="hi-kind global">全体</span><span class="hi-name">${escapeHtml(h.globalLabel)}</span><span class="hi-desc">${escapeHtml(effectText(GLOBAL_MAP, h.globalId))}</span></div>
+                        <div class="hi-row"><span class="hi-kind local">局地</span><span class="hi-name">${escapeHtml(h.localLabel)}</span><span class="hi-desc">${escapeHtml(effectText(LOCAL_MAP, h.localId))}</span></div>
+                        ${teamResultsHtml(h.year)}
+                    </div>`;
+                }).join("");
+            }
+
+            document.getElementById("clear-history-btn").addEventListener("click", () => {
+                if (!currentRoomId || broadcastHistory.length === 0) return;
+                if (!confirm(`ルーム「${currentRoomId}」の配信履歴を消しますか？\n（各班のゲームや決算ログには影響しません）`)) return;
+                broadcastHistory = [];
+                saveHistory();
+                renderHistory();
+            });
+
             // 🟢 2. イベント一斉送信処理
             document.getElementById("broadcast-btn").addEventListener("click", async () => {
                 if (!currentChannel || !currentRoomId) { alert("先に接続してください"); return; }
@@ -394,6 +511,16 @@
                     event: 'yearly_events',
                     payload: { global_id: globalId, local_id: localSelect.value }
                 });
+
+                // 📜 配信履歴に記録（年度は、決算済みの最新年度の次の年とみなす）
+                broadcastHistory.push({
+                    sentAt: Date.now(),
+                    year: Math.min(latestMaxYear + 1, 3),
+                    globalId, globalLabel: globalName,
+                    localId: localSelect.value, localLabel: optionLabel(localSelect, localSelect.value)
+                });
+                saveHistory();
+                renderHistory();
                 alert("✅ 全班にイベントを送信しました！");
             });
 
@@ -403,11 +530,16 @@
 
                 const { data, error } = await supabaseClient
                     .from('yearly_logs')
-                    .select('player_name, year, current_money')
+                    .select('player_name, year, current_money, global_event, local_event')
                     .eq('room_id', currentRoomId)
                     .order('year', { ascending: true });
 
                 if (error || !data) return;
+
+                // 📜 配信履歴に、各班が実際に受け取ったイベントを表示する
+                latestLogs = data;
+                latestMaxYear = data.reduce((m, l) => Math.max(m, Number(l.year) || 0), 0);
+                renderHistory();
 
                 // ランキング用に最新年度データを抽出
                 const latestDataMap = {};
