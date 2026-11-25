@@ -108,6 +108,17 @@
         .pending-line { font-size: 11px; color: #b45309; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pending-line.none { color: #94a3b8; }
 
+        /* 📡 各チームの進み具合（イベント受信待ちの数） */
+        .wait-box { border: 2px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+        .wait-main { display: flex; justify-content: space-between; align-items: baseline; font-weight: bold; color: #b45309; font-size: 14px; }
+        .wait-main b { font-size: 24px; color: #92400e; margin: 0 3px; }
+        .wait-main .online { font-size: 12px; font-weight: normal; color: #64748b; }
+        .wait-names { font-size: 11px; color: #92400e; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .phase-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+        .phase-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1px 8px; font-size: 11px; color: #475569; cursor: default; }
+        .phase-chip b { color: #1e293b; }
+        .phase-chip.zero { opacity: 0.5; }
+
         /* 📜 イベントの効果プレビュー＆配信履歴 */
         .effect-preview { font-size: 12px; color: #475569; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 4px; padding: 5px 8px; margin-top: 5px; line-height: 1.5; }
         .effect-preview.global { border-left-color: #f59e0b; }
@@ -154,6 +165,11 @@
             <div class="left-col">
                 <div class="panel">
                     <h3>📢 イベント一斉配信</h3>
+                    <div class="wait-box" title="ゲーム画面を開いているチームだけが数えられます">
+                        <div class="wait-main"><span>⏳ イベント受信待ち<b id="wait-count">0</b>チーム</span><span class="online">接続中 <span id="online-count">0</span>チーム</span></div>
+                        <div class="wait-names" id="wait-names">ルームに接続すると表示されます</div>
+                        <div class="phase-chips" id="phase-chips"></div>
+                    </div>
                     <div class="control-group">
                         <label>🌍 全体環境イベント (価格変動)</label>
                         <select id="global-select">
@@ -261,7 +277,9 @@
 
                 // イベント配信用チャンネル設定
                 if (currentChannel) supabaseClient.removeChannel(currentChannel);
-                currentChannel = supabaseClient.channel(`room-${roomId}`);
+                currentChannel = supabaseClient.channel(`room-${roomId}`, { config: { presence: { enabled: true, key: "host" } } });
+                currentChannel.on('presence', { event: 'sync' }, () => renderTeamPhases(currentChannel.presenceState()));
+                renderTeamPhases({});
                 currentChannel.subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         statusEl.innerHTML = `🟢 接続中: ${roomId}`;
@@ -408,6 +426,40 @@
                     ? `⚠️ ${failed.length}チームの土地を保存できませんでした。もう一度押してください。`
                     : "✅ 全チームに土地を発表しました！");
             });
+
+            // 📡 各チームの進み具合（ゲーム画面から Realtime Presence で届く）--------------
+            //   イベント受信待ち = 投資を確定して、今年度のイベントをまだ受け取っていない状態
+            const PHASES = [
+                { id: "waiting", label: "土地の発表待ち" },
+                { id: "setup", label: "戦略を設定中" },
+                { id: "ready", label: "受信済み・決算前" },
+                { id: "settled", label: "決算済み" },
+                { id: "finished", label: "3年間終了" }
+            ];
+            function phaseOf(st) {
+                if (st.phase === "running") return st.received ? "ready" : "eventwait";
+                if (st.phase === "reveal") return "setup";
+                return st.phase;
+            }
+            function renderTeamPhases(state) {
+                const teams = Object.values(state).map(list => list[list.length - 1]).filter(st => st && st.team);
+                const byPhase = {};
+                teams.forEach(st => { const ph = phaseOf(st); (byPhase[ph] = byPhase[ph] || []).push(st); });
+                const label = st => `${st.team}（${st.group === "log" ? "ログあり" : st.group === "nolog" ? "ログなし" : "?"}・第${st.year}年）`;
+                const waiting = byPhase.eventwait || [];
+                document.getElementById("wait-count").textContent = waiting.length;
+                document.getElementById("online-count").textContent = teams.length;
+                const namesEl = document.getElementById("wait-names");
+                namesEl.textContent = !currentRoomId ? "ルームに接続すると表示されます"
+                    : waiting.length ? waiting.map(st => st.team).join("、")
+                    : teams.length ? "受信待ちのチームはありません" : "ゲーム画面を開いているチームはまだありません";
+                namesEl.title = waiting.length ? tooltipList("イベント受信待ち", waiting.map(label), "") : "";
+                document.getElementById("phase-chips").innerHTML = PHASES.map(p => {
+                    const list = byPhase[p.id] || [];
+                    return `<span class="phase-chip${list.length ? "" : " zero"}" title="${escapeHtml(tooltipList(`${p.label}（${list.length}チーム）`, list.map(label), "なし"))}">${p.label} <b>${list.length}</b></span>`;
+                }).join("");
+            }
+            renderTeamPhases({});
 
             // 📜 イベントの効果表示と配信履歴 ---------------------------------------
             //   配信した内容はこのパソコン（ブラウザ）にルームごとに保存する
