@@ -63,7 +63,7 @@ const CROP_MASTER = [
     },
     {
         id: "daikon",
-        name: "大根",
+        name: "人参",
         family: "aburana",    // アブラナ科
         difficulty: "B",
         yieldPerUnit: 300,
