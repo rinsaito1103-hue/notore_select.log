@@ -53,13 +53,13 @@ const CROP_MASTER = [
     },
     {
         id: "artichoke",
-        name: "アーティチョーク",
-        family: "kiku",       // キク科
+        name: "メロン",
+        family: "uri",        // ウリ科
         difficulty: "S",
         yieldPerUnit: 180,
         unitPrice: 80000,
         costPerUnit: 100000,
-        desc: "難易度Sの超希少作物。ベテランか、ITシステムでの管理を行わないと全く収穫できません。"
+        desc: "難易度Sの高級作物。ベテランか、ITシステムでの管理を行わないと全く収穫できません。"
     },
     {
         id: "daikon",
