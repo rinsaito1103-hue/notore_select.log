@@ -1024,3 +1024,9 @@ body.admin-mode {
     .member-row .member-id-input { flex: 0 0 120px; width: 120px; }
     .member-row .member-name-input { flex: 1; width: auto; min-width: 0; }
 }
+
+/* 🖼️ 作物のイラスト（プルダウンの横） */
+.crop-select-row { display: flex; align-items: center; gap: 8px; }
+.crop-select-row select { flex: 1 1 auto; min-width: 0; }
+.crop-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; }
+.crop-thumb[hidden] { display: none; }

@@ -176,6 +176,7 @@ function generateLandStrategyUI() {
                 <div class="card-inner-flex">
                     <div class="land-strategy-card-left">
                         <label>🌾 作付する作物:</label>
+                        <div class="crop-select-row">
                         <select class="land-crop-select" onchange="calculateLiveCardCost(${i})">
                             <option value="" ${savedCropId === '' ? 'selected' : ''}>-- 未選択 --</option>
                             <option value="hakusai" ${savedCropId === 'hakusai' ? 'selected' : ''}>🥬 S:仙台白菜</option>
@@ -184,9 +185,11 @@ function generateLandStrategyUI() {
                             <option value="strawberry" ${savedCropId === 'strawberry' ? 'selected' : ''}>🍓 A:いちご</option>
                             <option value="japanese_parsley" ${savedCropId === 'japanese_parsley' ? 'selected' : ''}>🌿 A:せり</option>
                             <option value="corn" ${savedCropId === 'corn' ? 'selected' : ''}>🌽 B:とうもろこし</option>
-                            <option value="daikon" ${savedCropId === 'daikon' ? 'selected' : ''}>🥕 B:大根</option>
+                            <option value="daikon" ${savedCropId === 'daikon' ? 'selected' : ''}>B:大根</option>
                             <option value="cabbage" ${savedCropId === 'cabbage' ? 'selected' : ''}>🥬 C:キャベツ</option>
                         </select>
+                        <img class="crop-thumb" alt="" hidden>
+                        </div>
                         <label style="margin-top: 5px;">🏪 出荷・販売先:</label>
                         <select class="land-market-select" onchange="calculateLiveCardCost(${i})">
                             <option value="" ${savedMarketId === '' ? 'selected' : ''}>-- 未選択 --</option>
@@ -235,6 +238,21 @@ window.calculateLiveCardCost = function(cardOrIdx) {
     if (!card) return;
 
     const cropId = card.querySelector(".land-crop-select").value;
+
+    // 🖼️ 選んだ作物のイラストをプルダウンの横に表示する
+    const cropThumb = card.querySelector(".crop-thumb");
+    if (cropThumb) {
+        const cropForThumb = CROP_MASTER.find(c => c.id === cropId);
+        if (cropForThumb) {
+            cropThumb.src = `crops/${cropId}.webp`;
+            cropThumb.alt = cropForThumb.name;
+            cropThumb.title = cropForThumb.name;
+            cropThumb.hidden = false;
+        } else {
+            cropThumb.hidden = true;
+        }
+    }
+
     const landCostBase = gameState.currentLand ? gameState.currentLand.cost : 0;
     const crop = CROP_MASTER.find(c => c.id === cropId);
     let baseYieldPerUnit = crop ? crop.yieldPerUnit : 0;
