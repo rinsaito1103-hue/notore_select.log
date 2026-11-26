@@ -63,7 +63,7 @@ const CROP_MASTER = [
     },
     {
         id: "daikon",
-        name: "人参",
+        name: "大根",
         family: "seri",       // セリ科
         difficulty: "B",
         yieldPerUnit: 300,
