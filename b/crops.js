@@ -44,7 +44,7 @@ const CROP_MASTER = [
     {
         id: "hakusai",
         name: "仙台白菜",
-        family: "aburana",    // アブラナ科（キャベツと被る罠）
+        family: "aburana",    // アブラナ科（キャベツや大根と被る罠）
         difficulty: "S",
         yieldPerUnit: 240,
         unitPrice: 50000,
@@ -64,7 +64,7 @@ const CROP_MASTER = [
     {
         id: "daikon",
         name: "大根",
-        family: "seri",       // セリ科
+        family: "aburana",    // アブラナ科
         difficulty: "B",
         yieldPerUnit: 300,
         unitPrice: 100000,
