@@ -1601,7 +1601,25 @@ function renderFinalSummaryChart() {
 // ==========================================================================
 let businessLogs = [];
 
-window.openLogModal = function() {
+// 📊 経営履歴ボタンを押したことを Supabase（log_button_clicks）に記録する（分析用）
+//   source: 'setup' = 戦略設定画面のボタン / 'result' = 最終結果画面のボタン
+//   ※ 再読み込み時に自動で開いた場合（source なし）は記録しない
+function recordLogButtonClick(source) {
+    if (!gameState.roomId || !gameState.playerName) return;
+    supabaseClient.from('log_button_clicks').insert([{
+        room_id: gameState.roomId,
+        player_name: gameState.playerName,
+        log_group: LOG_GROUP,
+        year: gameState.year,
+        game_phase: gamePhase,
+        button: source
+    }]).then(res => {
+        if (res.error) console.warn("経営履歴ボタンの記録に失敗しました", res.error);
+    });
+}
+
+window.openLogModal = function(source) {
+    if (source) recordLogButtonClick(source);
     document.getElementById('log-modal').style.display = 'flex';
     renderLogs();
 };
