@@ -70,26 +70,6 @@ const sumCumRevenue = document.getElementById("sum-cum-revenue");
 
 let currentYearPlannedProfitSum = 0;
 
-// 🏦 借入（資金が足りないときは不足分を自動で借りる）
-//   gameState.money がマイナスのとき、その分が借入金の残高
-//   借入金には決算のたびに利息がかかり、売上が入ると自動で返済される（資金がプラスに戻る）
-const LOAN_INTEREST_RATE = 0.03; // 借入金の年利（3%）
-
-function getLoanBalance() {
-    return Math.max(0, -gameState.money);
-}
-
-// 資金の表示（マイナスなら赤字にして「借入中」と出す）
-function updateMoneyDisplay() {
-    moneyElement.textContent = gameState.money.toLocaleString();
-    moneyElement.style.color = gameState.money < 0 ? "#dc2626" : "#1e40af";
-    const debtNote = document.getElementById("debt-note");
-    if (debtNote) {
-        const loan = getLoanBalance();
-        debtNote.textContent = loan > 0 ? `🏦 借入中: ${loan.toLocaleString()} 円` : "";
-    }
-}
-
 // 💡【新設】イベント受信状態をチェックして決算ボタンを制御する関数
 function checkAndEnableEndYearBtn() {
     if (endYearBtn && !endYearBtn.classList.contains("hidden")) {
@@ -527,10 +507,7 @@ function updateSetupFinancialBanner() {
     setupYearDisplay.textContent = gameState.year;
     sumCumExpense.textContent = `${gameState.cumExpenses.toLocaleString()} 円`;
     sumCumRevenue.textContent = `${gameState.cumRevenue.toLocaleString()} 円`;
-    sumCurrentMoney.textContent = gameState.money < 0
-        ? `${gameState.money.toLocaleString()} 円（借入中）`
-        : `${gameState.money.toLocaleString()} 円`;
-    sumCurrentMoney.style.color = gameState.money < 0 ? "#dc2626" : "#1e40af"; // 🌟 現在の所持資金残高を毎回反映（これまで初期値のまま固定されていたバグを修正）
+    sumCurrentMoney.textContent = `${gameState.money.toLocaleString()} 円`; // 🌟 現在の所持資金残高を毎回反映（これまで初期値のまま固定されていたバグを修正）
 
     let totalInvestment = 0; 
     const cards = document.querySelectorAll(".land-strategy-card");
@@ -923,8 +900,10 @@ beginBusinessBtn.addEventListener("click", () => {
         }
     });
 
-    // 🏦 資金が足りないときは、不足分を自動で借り入れる
-    const autoLoan = Math.max(0, totalInvestment - Math.max(0, gameState.money));
+    if (gameState.money < totalInvestment) {
+        alert("初期資金が足りません！投資を少し減らして再調整してください。");
+        return;
+    }
 
     currentYearStartMoney = gameState.money;
     currentYearExpenses = totalInvestment;
@@ -934,7 +913,7 @@ beginBusinessBtn.addEventListener("click", () => {
 
     displayPlayerName.textContent = gameState.playerName;
     landNameElement.textContent = gameState.currentLand.name;
-    updateMoneyDisplay();
+    moneyElement.textContent = gameState.money.toLocaleString();
     currentYearElement.textContent = gameState.year;
 
     document.getElementById("financial-dashboard").classList.add("hidden");
@@ -942,10 +921,7 @@ beginBusinessBtn.addEventListener("click", () => {
     checkAndEnableEndYearBtn(); 
 
     document.getElementById("next-year-phase-btn").classList.add("hidden");
-    const loanMessage = autoLoan > 0
-        ? `\n\n🏦 資金が足りないため、不足分 ${autoLoan.toLocaleString()}円 を自動で借り入れました。\n借入金の残高: ${getLoanBalance().toLocaleString()}円（決算時に年${Math.round(LOAN_INTEREST_RATE * 100)}%の利息がかかります）`
-        : "";
-    alert(`【第 ${gameState.year} 年目 全農地・投資確定！】\n本期の投資総額: ${(totalInvestment).toLocaleString()}円${loanMessage}`);
+    alert(`【第 ${gameState.year} 年目 全農地・投資確定！】\n本期の投資総額: ${(totalInvestment).toLocaleString()}円`);
 
     setupScreen.classList.add("hidden");
     gameContainer.classList.remove("hidden");
@@ -1184,22 +1160,9 @@ endYearBtn.addEventListener("click", () => {
         gameState.cumExpenses += fuelSurgeCost;
     }
 
-    // 🏦 借入金の利息（決算時点の借入残高に年利をかけて、費用として支払う）
-    const loanInterest = Math.round(getLoanBalance() * LOAN_INTEREST_RATE);
-    if (loanInterest > 0) {
-        currentYearExpenses += loanInterest;
-        gameState.money -= loanInterest;
-        gameState.cumExpenses += loanInterest;
-    }
-    const interestRow = document.getElementById("stmt-loan-interest-row");
-    if (interestRow) {
-        interestRow.classList.toggle("hidden", loanInterest === 0);
-        document.getElementById("stmt-loan-interest").textContent = `- ${loanInterest.toLocaleString()} 円`;
-    }
-
-    gameState.money += totalYearRevenue; // 売上が入ると、借入金はその分自動で返済される
+    gameState.money += totalYearRevenue;
     gameState.cumRevenue += totalYearRevenue; 
-    updateMoneyDisplay();
+    moneyElement.textContent = gameState.money.toLocaleString();
 
     stmtStartMoney.textContent = `${currentYearStartMoney.toLocaleString()} 円`;
     stmtTotalExpense.textContent = `- ${currentYearExpenses.toLocaleString()} 円`;
@@ -1823,7 +1786,7 @@ function restoreProgress(saved) {
     document.getElementById("status-bar").classList.remove("hidden");
     displayPlayerName.textContent = gameState.playerName;
     landNameElement.textContent = gameState.currentLand.name;
-    updateMoneyDisplay();
+    moneyElement.textContent = gameState.money.toLocaleString();
     currentYearElement.textContent = gameState.year;
 
     subscribeRoomEvents(gameState.roomId);
