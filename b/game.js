@@ -70,6 +70,56 @@ const sumCumRevenue = document.getElementById("sum-cum-revenue");
 
 let currentYearPlannedProfitSum = 0;
 
+// 🔽 作物のプルダウン：選択肢の横に絵（絵文字 または data-img の画像）を出せる自作のプルダウン
+//   中身は元の <select> のままなので、値の読み書きや onchange はこれまで通り使える
+function cropOptionHtml(opt) {
+    const img = opt.dataset.img ? `<img class="crop-dd-icon" src="${opt.dataset.img}" alt="">` : "";
+    return `${img}<span class="crop-dd-text">${opt.textContent}</span>`;
+}
+
+function syncCropDropdown(sel) {
+    const dd = sel && sel.nextElementSibling;
+    if (!dd || !dd.classList.contains("crop-dd")) return;
+    const opt = sel.options[sel.selectedIndex];
+    dd.querySelector(".crop-dd-btn").innerHTML = (opt ? cropOptionHtml(opt) : "") + `<span class="crop-dd-arrow">▾</span>`;
+    dd.querySelectorAll(".crop-dd-item").forEach(item => item.classList.toggle("selected", item.dataset.value === sel.value));
+}
+
+function enhanceCropSelect(sel) {
+    if (!sel || sel.dataset.enhanced) return;
+    sel.dataset.enhanced = "1";
+    sel.classList.add("crop-select-native");
+    const dd = document.createElement("div");
+    dd.className = "crop-dd";
+    dd.innerHTML = `<button type="button" class="crop-dd-btn"></button><div class="crop-dd-list" hidden>${
+        Array.from(sel.options).map(o => `<div class="crop-dd-item" data-value="${o.value}">${cropOptionHtml(o)}</div>`).join("")
+    }</div>`;
+    sel.after(dd);
+    const list = dd.querySelector(".crop-dd-list");
+    dd.querySelector(".crop-dd-btn").addEventListener("click", e => {
+        e.stopPropagation();
+        const willOpen = list.hidden;
+        document.querySelectorAll(".crop-dd-list").forEach(l => { l.hidden = true; });
+        list.hidden = !willOpen;
+    });
+    list.addEventListener("click", e => {
+        e.stopPropagation();
+        const item = e.target.closest(".crop-dd-item");
+        if (!item) return;
+        list.hidden = true;
+        if (sel.value !== item.dataset.value) {
+            sel.value = item.dataset.value;
+            sel.dispatchEvent(new Event("change"));
+        }
+        syncCropDropdown(sel);
+    });
+    syncCropDropdown(sel);
+}
+
+document.addEventListener("click", () => {
+    document.querySelectorAll(".crop-dd-list").forEach(l => { l.hidden = true; });
+});
+
 // 💡【新設】イベント受信状態をチェックして決算ボタンを制御する関数
 function checkAndEnableEndYearBtn() {
     if (endYearBtn && !endYearBtn.classList.contains("hidden")) {
@@ -185,7 +235,7 @@ function generateLandStrategyUI() {
                             <option value="strawberry" ${savedCropId === 'strawberry' ? 'selected' : ''}>🍓 A:いちご</option>
                             <option value="japanese_parsley" ${savedCropId === 'japanese_parsley' ? 'selected' : ''}>🌿 A:せり</option>
                             <option value="corn" ${savedCropId === 'corn' ? 'selected' : ''}>🌽 B:とうもろこし</option>
-                            <option value="daikon" ${savedCropId === 'daikon' ? 'selected' : ''}>B:大根</option>
+                            <option value="daikon" data-img="crops/daikon.webp" ${savedCropId === 'daikon' ? 'selected' : ''}>B:大根</option>
                             <option value="cabbage" ${savedCropId === 'cabbage' ? 'selected' : ''}>🥬 C:キャベツ</option>
                         </select>
                         <img class="crop-thumb" alt="" hidden>
@@ -221,6 +271,7 @@ function generateLandStrategyUI() {
             </div>
         `;
         landCardsContainer.insertAdjacentHTML("beforeend", cardHtml);
+        enhanceCropSelect(landCardsContainer.querySelector(`.land-strategy-card[data-idx="${i}"] .land-crop-select`));
         calculateLiveCardCost(i); 
     }
 }
@@ -238,6 +289,7 @@ window.calculateLiveCardCost = function(cardOrIdx) {
     if (!card) return;
 
     const cropId = card.querySelector(".land-crop-select").value;
+    syncCropDropdown(card.querySelector(".land-crop-select"));
 
     // 🖼️ 選んだ作物のイラストをプルダウンの横に表示する
     const cropThumb = card.querySelector(".crop-thumb");
