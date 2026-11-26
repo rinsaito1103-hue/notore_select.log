@@ -178,7 +178,7 @@ function generateLandStrategyUI() {
                         <label>🌾 作付する作物:</label>
                         <select class="land-crop-select" onchange="calculateLiveCardCost(${i})">
                             <option value="" ${savedCropId === '' ? 'selected' : ''}>-- 未選択 --</option>
-                            <option value="hakusai" ${savedCropId === 'hakusai' ? 'selected' : ''}>🥬 S:仙台白菜</option>
+                            <option value="hakusai" ${savedCropId === 'hakusai' ? 'selected' : ''}>🥦 S:ブロッコリー</option>
                             <option value="artichoke" ${savedCropId === 'artichoke' ? 'selected' : ''}>🍈 S:メロン</option>
                             <option value="tomato" ${savedCropId === 'tomato' ? 'selected' : ''}>🍅 A:トマト</option>
                             <option value="strawberry" ${savedCropId === 'strawberry' ? 'selected' : ''}>🍓 A:いちご</option>

@@ -43,7 +43,7 @@ const CROP_MASTER = [
     },
     {
         id: "hakusai",
-        name: "仙台白菜",
+        name: "ブロッコリー",
         family: "aburana",    // アブラナ科（キャベツと被る罠）
         difficulty: "S",
         yieldPerUnit: 240,
