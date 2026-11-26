@@ -683,9 +683,16 @@
                 const { data, error } = await supabaseClient.from('yearly_logs').select('*').eq('room_id', currentRoomId).order('player_name').order('year');
                 if (error || !data || data.length === 0) { alert("データがありません"); return; }
 
-                let csv = "班名,群,土地,年度,導入資材,雇用人数,全体環境,局地環境,売上高(円),費用(円),純利益(円),農地別詳細データ,要因分析\n";
+                // 📊 経営履歴ボタンを押した回数（班・年度ごと）。表がまだ無いときは空欄にする
+                const clickCount = {};
+                const clicks = await supabaseClient.from('log_button_clicks').select('player_name, year').eq('room_id', currentRoomId);
+                if (clicks.error) console.warn("経営履歴ボタンの記録を取得できませんでした", clicks.error);
+                (clicks.data || []).forEach(c => { const k = `${c.player_name}|${c.year}`; clickCount[k] = (clickCount[k] || 0) + 1; });
+                const clickCell = log => clicks.error ? "" : (clickCount[`${log.player_name}|${log.year}`] || 0);
+
+                let csv = "班名,群,土地,年度,導入資材,雇用人数,全体環境,局地環境,売上高(円),費用(円),純利益(円),農地別詳細データ,要因分析,経営履歴ボタン回数\n";
                 data.forEach(log => {
-                    csv += `"${log.player_name}","${log.log_group === 'log' ? 'ログあり' : log.log_group === 'nolog' ? 'ログなし' : ''}","${log.land_name || ''}",${log.year},"${log.investments}",${log.staff_count},"${log.global_event}","${log.local_event}",${log.sales},${log.expense},${log.net_profit},"${log.land_details || ''}","${log.feedback}"\n`;
+                    csv += `"${log.player_name}","${log.log_group === 'log' ? 'ログあり' : log.log_group === 'nolog' ? 'ログなし' : ''}","${log.land_name || ''}",${log.year},"${log.investments}",${log.staff_count},"${log.global_event}","${log.local_event}",${log.sales},${log.expense},${log.net_profit},"${log.land_details || ''}","${log.feedback}",${clickCell(log)}\n`;
                 });
 
                 const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
