@@ -655,6 +655,33 @@ function attachRoomIdNormalizer(input) {
     input.addEventListener("compositionend", () => { input.dataset.composing = "0"; apply(); });
 }
 attachRoomIdNormalizer(document.getElementById("room-id-input"));
+// 🌟 チーム名は「全角数字 → 半角」にそろえ、アルファベット（全角・半角とも）は入力できないようにする
+function normalizeTeamName(value) {
+    return value
+        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/[A-Za-zＡ-Ｚａ-ｚ]/g, "");
+}
+function attachTeamNameNormalizer(input) {
+    const apply = () => {
+        const before = input.value;
+        const fixed = normalizeTeamName(before);
+        if (fixed !== before) {
+            const pos = input.selectionStart;
+            const removed = before.length - fixed.length;
+            input.value = fixed;
+            if (pos !== null) input.setSelectionRange(Math.max(0, pos - removed), Math.max(0, pos - removed));
+        }
+    };
+    input.addEventListener("input", () => {
+        // 日本語入力の変換中は触らない（確定後に整える）
+        if (input.dataset.composing === "1") return;
+        apply();
+    });
+    input.addEventListener("compositionstart", () => { input.dataset.composing = "1"; });
+    input.addEventListener("compositionend", () => { input.dataset.composing = "0"; apply(); });
+}
+attachTeamNameNormalizer(nameInput);
+
 
 // --- 3.5 チームメンバー（学籍番号・氏名）の入力欄（1チーム最大10人） ---
 const MAX_TEAM_SIZE = 10;
@@ -793,7 +820,7 @@ function waitForLandReveal() {
 
 async function startGame(config) {
     const roomId = normalizeRoomId(document.getElementById("room-id-input").value).trim();
-    const name = nameInput.value.trim();
+    const name = normalizeTeamName(nameInput.value).trim();
     if (!roomId) { alert("ルームIDを入力してください！"); return; }
     if (!name) { alert("チーム名を入力してください！"); return; }
     const teamResult = collectTeamMembers();
