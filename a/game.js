@@ -633,6 +633,29 @@ function updateSetupFinancialBanner() {
     // ▲▲ ここまで ▲▲
 }
 
+// 🌟 ルームIDは「全角英数字 → 半角」「小文字 → 大文字」に自動でそろえる（先生画面と同じ規則）
+function normalizeRoomId(value) {
+    return value.normalize("NFKC").toUpperCase();
+}
+function attachRoomIdNormalizer(input) {
+    const apply = () => {
+        const pos = input.selectionStart;
+        const fixed = normalizeRoomId(input.value);
+        if (fixed !== input.value) {
+            input.value = fixed;
+            if (pos !== null) input.setSelectionRange(pos, pos);
+        }
+    };
+    input.addEventListener("input", () => {
+        // 日本語入力の変換中は触らない（確定後に整える）
+        if (input.dataset.composing === "1") return;
+        apply();
+    });
+    input.addEventListener("compositionstart", () => { input.dataset.composing = "1"; });
+    input.addEventListener("compositionend", () => { input.dataset.composing = "0"; apply(); });
+}
+attachRoomIdNormalizer(document.getElementById("room-id-input"));
+
 // --- 3.5 チームメンバー（学籍番号・氏名）の入力欄（1チーム最大10人） ---
 const MAX_TEAM_SIZE = 10;
 const teamSizeSelect = document.getElementById("team-size-select");
@@ -769,7 +792,7 @@ function waitForLandReveal() {
 }
 
 async function startGame(config) {
-    const roomId = document.getElementById("room-id-input").value.trim();
+    const roomId = normalizeRoomId(document.getElementById("room-id-input").value).trim();
     const name = nameInput.value.trim();
     if (!roomId) { alert("ルームIDを入力してください！"); return; }
     if (!name) { alert("チーム名を入力してください！"); return; }
