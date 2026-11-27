@@ -633,8 +633,8 @@ function updateSetupFinancialBanner() {
     // ▲▲ ここまで ▲▲
 }
 
-// --- 3.5 チームメンバー（学籍番号・氏名）の入力欄（1チーム最大5人） ---
-const MAX_TEAM_SIZE = 5;
+// --- 3.5 チームメンバー（学籍番号・氏名）の入力欄（1チーム最大10人） ---
+const MAX_TEAM_SIZE = 10;
 const teamSizeSelect = document.getElementById("team-size-select");
 const memberSection = document.getElementById("member-section");
 const memberFields = document.getElementById("member-fields");
@@ -655,7 +655,7 @@ function renderMemberFields(count) {
         const row = document.createElement("div");
         row.className = "member-row";
         row.innerHTML = `
-            <span class="member-no">${i + 1}人目</span>
+            <span class="member-no"><span class="member-no-num">${i + 1}</span><span class="member-no-suffix">人目</span></span>
             <input type="text" class="member-id-input" maxlength="12" inputmode="latin" autocomplete="off" placeholder="学籍番号" aria-label="${i + 1}人目の学籍番号">
             <input type="text" class="member-name-input" maxlength="30" autocomplete="off" placeholder="氏名" aria-label="${i + 1}人目の氏名">
         `;
@@ -676,6 +676,8 @@ function renderMemberFields(count) {
         memberFields.appendChild(row);
     }
     memberSection.classList.toggle("hidden", count === 0);
+    // 6人以上は番号を入力欄の左に置き、縦の高さを詰める（スタートボタンが画面外に出にくくする）
+    memberSection.classList.toggle("is-many", count > 5);
 }
 
 teamSizeSelect.addEventListener("change", () => {
@@ -687,7 +689,7 @@ teamSizeSelect.addEventListener("change", () => {
 function collectTeamMembers() {
     const size = parseInt(teamSizeSelect.value, 10);
     if (!Number.isInteger(size) || size < 1 || size > MAX_TEAM_SIZE) {
-        return { error: "チーム人数（1〜5人）を選択してください！" };
+        return { error: `チーム人数（1〜${MAX_TEAM_SIZE}人）を選択してください！` };
     }
     const rows = memberFields.querySelectorAll(".member-row");
     const members = [];
@@ -784,7 +786,7 @@ async function startGame(config) {
 
     gameState.roomId = roomId; // 🌟ルームIDを保存
     gameState.playerName = name; // 🌟「チーム名」として使う（ランキングやデータ保存の識別子）
-    gameState.members = teamResult.members; // 🌟学籍番号と氏名（最大5人）
+    gameState.members = teamResult.members; // 🌟学籍番号と氏名（最大10人）
     saveTeamMembers(roomId, name, teamResult.members);
     gameState.difficulty = config.id;
     gameState.difficultyName = config.name;

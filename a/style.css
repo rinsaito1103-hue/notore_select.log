@@ -977,7 +977,7 @@ body.admin-mode {
     padding-top: 1px;
 }
 
-/* 🌟 1人ずつ縦（番号・学籍番号・氏名）にまとめ、最大5人を横一列に並べる（人数が増えても高さが変わらない） */
+/* 🌟 1人ずつ縦（番号・学籍番号・氏名）にまとめ、1行に5人ずつ並べる（6〜10人のときは2行になる） */
 #member-fields {
     flex: 1;
     min-width: 0;
@@ -1005,6 +1005,32 @@ body.admin-mode {
     font-size: 14px;
 }
 
+/* 🌟 6〜10人のとき：番号を丸いバッジにして入力欄の左に置き、2行になっても高さを抑える */
+.member-section.is-many #member-fields { gap: 6px 10px; }
+.member-section.is-many .member-row {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 5px;
+    row-gap: 3px;
+}
+.member-section.is-many .member-row .member-no {
+    grid-row: 1 / span 2;
+    align-self: center;
+}
+.member-section.is-many .member-no-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    font-size: 11px;
+}
+.member-section.is-many .member-no-suffix { display: none; }
+.member-section.is-many .member-row input[type="text"] { padding-top: 5px; padding-bottom: 5px; }
+
 /* 背の低い画面（ノートPCのブラウザなど）では余白をさらに詰めて、タイトルを隠さないようにする */
 @media (max-height: 760px) {
     .start-card { padding: 12px 24px; gap: 10px; }
@@ -1023,6 +1049,9 @@ body.admin-mode {
     .member-row .member-no { flex: 0 0 42px; }
     .member-row .member-id-input { flex: 0 0 120px; width: 120px; }
     .member-row .member-name-input { flex: 1; width: auto; min-width: 0; }
+    .member-section.is-many .member-row { display: flex; }
+    .member-section.is-many .member-no-num { display: inline; width: auto; height: auto; background: none; font-size: 12px; }
+    .member-section.is-many .member-no-suffix { display: inline; }
 }
 
 /* 🖼️ 作物のイラスト（プルダウンの横） */
