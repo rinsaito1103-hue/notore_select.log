@@ -47,6 +47,13 @@ function recordLoan(moneyBefore, investment, loanAmount) {
         if (res.error) console.warn("融資の記録に失敗しました", res.error);
     });
 }
+// 💰 画面上部の残高の横に、今年度受けている融資額を表示する（融資がない時は非表示）
+function updateLoanNote() {
+    const note = document.getElementById("money-loan-note");
+    if (!note) return;
+    const loan = gameState.currentYearLoan || 0;
+    note.textContent = loan > 0 ? `（うち融資 ${loan.toLocaleString()} 円・年度末に返済）` : "";
+}
 const SAVE_KEY = "notore_nolog_save_v1"; // ログあり版と保存データが混ざらないよう別キー
 
 // 📡【新設】Supabase 受信アンテナの設定
@@ -1053,10 +1060,10 @@ beginBusinessBtn.addEventListener("click", () => {
         gameState.loanCount = (gameState.loanCount || 0) + loanAmount / LOAN_UNIT;
         gameState.loanTotal = (gameState.loanTotal || 0) + loanAmount;
         recordLoan(moneyBeforeLoan, totalInvestment, loanAmount);
-        alert(`【資金不足のため融資を受けました】\n投資総額 ${totalInvestment.toLocaleString()}円 に対して、所持資金が ${moneyBeforeLoan.toLocaleString()}円 しかありませんでした。\n${loanAmount.toLocaleString()}円 の融資を受けて年度を開始します。\n※融資額は今年度の決算時に全額返済（資金から差し引き）されます。`);
+        alert(`【資金不足のため融資を受けました】\n投資総額 ${totalInvestment.toLocaleString()}円 に対して、所持資金が ${moneyBeforeLoan.toLocaleString()}円 しかありませんでした。\n${loanAmount.toLocaleString()}円 の融資を受けて年度を開始します。\n融資額は残高に加算されています（今年度の決算時に全額返済）。`);
     }
 
-    currentYearStartMoney = moneyBeforeLoan; // 期首資金は融資を含めない
+    currentYearStartMoney = gameState.money; // 期首資金は融資を足した残高で表示する
     currentYearExpenses = totalInvestment;
 
     gameState.money -= totalInvestment;
@@ -1065,6 +1072,7 @@ beginBusinessBtn.addEventListener("click", () => {
     displayPlayerName.textContent = gameState.playerName;
     landNameElement.textContent = gameState.currentLand.name;
     moneyElement.textContent = gameState.money.toLocaleString();
+    updateLoanNote();
     currentYearElement.textContent = gameState.year;
 
     document.getElementById("financial-dashboard").classList.add("hidden");
@@ -1318,17 +1326,15 @@ endYearBtn.addEventListener("click", () => {
     const yearLoan = gameState.currentYearLoan || 0;
     gameState.money -= yearLoan;
     gameState.currentYearLoan = 0;
-    const loanRow = document.getElementById("stmt-loan-row");
     const repayRow = document.getElementById("stmt-repay-row");
-    if (loanRow && repayRow) {
-        loanRow.style.display = yearLoan > 0 ? "" : "none";
+    if (repayRow) {
         repayRow.style.display = yearLoan > 0 ? "" : "none";
-        document.getElementById("stmt-loan").textContent = `＋ ${yearLoan.toLocaleString()} 円`;
         document.getElementById("stmt-repay").textContent = `- ${yearLoan.toLocaleString()} 円`;
     }
     moneyElement.textContent = gameState.money.toLocaleString();
+    updateLoanNote();
 
-    stmtStartMoney.textContent = `${currentYearStartMoney.toLocaleString()} 円`;
+    stmtStartMoney.textContent = `${currentYearStartMoney.toLocaleString()} 円` + (yearLoan > 0 ? `（うち融資 ${yearLoan.toLocaleString()} 円）` : "");
     stmtTotalExpense.textContent = `- ${currentYearExpenses.toLocaleString()} 円`;
     stmtTotalRevenue.textContent = `＋ ${totalYearRevenue.toLocaleString()} 円`;
     stmtEndMoney.textContent = `${gameState.money.toLocaleString()} 円`;
@@ -1843,6 +1849,7 @@ function restoreProgress(saved) {
     displayPlayerName.textContent = gameState.playerName;
     landNameElement.textContent = gameState.currentLand.name;
     moneyElement.textContent = gameState.money.toLocaleString();
+    updateLoanNote();
     currentYearElement.textContent = gameState.year;
 
     subscribeRoomEvents(gameState.roomId);
