@@ -508,11 +508,28 @@
                 return map[id] ? map[id].desc : "";
             }
 
+            // 前年に配信した全体イベント（配信履歴のうち、対象年度より前で最も新しいもの）
+            function prevGlobalEventId(targetYear) {
+                for (let i = broadcastHistory.length - 1; i >= 0; i--) {
+                    if (broadcastHistory[i].year < targetYear) return broadcastHistory[i].globalId;
+                }
+                return null;
+            }
+
+            // ランダムを選んだときに、前年のイベントが起こりやすくなることを書き添える
+            function repeatNoteText(kind) {
+                const x = EVENT_REPEAT_MULTIPLIER;
+                if (kind === "local") return `（各班の前年の局地イベントは${x}倍起こりやすくなります）`;
+                const prevId = prevGlobalEventId(Math.min(latestMaxYear + 1, 3));
+                if (!prevId || prevId === "normal" || !GLOBAL_MAP[prevId]) return "";
+                return `（前年：${GLOBAL_MAP[prevId].name}が${x}倍起こりやすくなります）`;
+            }
+
             function updateEffectPreview() {
                 const g = document.getElementById("global-select").value;
                 const l = document.getElementById("local-select").value;
-                document.getElementById("global-effect").textContent = "効果：" + effectText(GLOBAL_MAP, g);
-                document.getElementById("local-effect").textContent = "効果：" + effectText(LOCAL_MAP, l);
+                document.getElementById("global-effect").textContent = "効果：" + effectText(GLOBAL_MAP, g) + (g === "random" ? repeatNoteText("global") : "");
+                document.getElementById("local-effect").textContent = "効果：" + effectText(LOCAL_MAP, l) + (l === "random_per_team" ? repeatNoteText("local") : "");
             }
             document.getElementById("global-select").addEventListener("change", updateEffectPreview);
             document.getElementById("local-select").addEventListener("change", updateEffectPreview);
@@ -540,6 +557,7 @@
             }
 
             function renderHistory() {
+                updateEffectPreview(); // 前年のイベントが変わると、ランダムの説明も変わるため
                 const list = document.getElementById("history-list");
                 if (broadcastHistory.length === 0) {
                     list.innerHTML = `<div class="history-empty">まだイベントを配信していません</div>`;
@@ -574,10 +592,11 @@
                 
                 let globalId = globalSelect.value;
                 let globalName = globalSelect.options[globalSelect.selectedIndex].text;
+                const targetYear = Math.min(latestMaxYear + 1, 3);
                 if (globalId === "random") {
-                    const options = Array.from(globalSelect.options).slice(1);
-                    const randOpt = options[Math.floor(Math.random() * options.length)];
-                    globalId = randOpt.value; globalName = randOpt.text + " (抽選)";
+                    // 前年に当たった全体イベントは起こりやすくする
+                    const picked = pickEventWithRepeatBoost(GLOBAL_EVENTS, prevGlobalEventId(targetYear));
+                    globalId = picked.id; globalName = optionLabel(globalSelect, picked.id) + " (抽選)";
                 }
 
                 if (!confirm(`【イベント送信確認】\n全体環境: ${globalName}\n局地環境: ${localSelect.options[localSelect.selectedIndex].text}\n\nこのイベントを全班に送信しますか？`)) return;
@@ -591,7 +610,7 @@
                 // 📜 配信履歴に記録（年度は、決算済みの最新年度の次の年とみなす）
                 broadcastHistory.push({
                     sentAt: Date.now(),
-                    year: Math.min(latestMaxYear + 1, 3),
+                    year: targetYear,
                     globalId, globalLabel: globalName,
                     localId: localSelect.value, localLabel: optionLabel(localSelect, localSelect.value)
                 });

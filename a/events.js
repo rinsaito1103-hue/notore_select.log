@@ -21,3 +21,19 @@ const LOCAL_EVENTS = [
     { id: "animal_damage", name: "獣害発生", desc: "ビニールハウスが破壊され、栽培していた作物がゼロになる" },
     { id: "good_weather", name: "好天", desc: "すべての作物の収穫量が2倍になる" }
 ];
+// ③ 前年に当たったイベントを翌年も起こりやすくする倍率
+//    ランダム抽選のときだけ、前年のイベント（「通常」以外）の重みをこの倍率にする
+//    例：局地7種で2倍 → 前年と同じイベントの確率 2/8 = 25%（通常時は 1/7 ≒ 14.3%）
+const EVENT_REPEAT_MULTIPLIER = 2;
+
+// イベント一覧から1つ抽選する（prevId が前年のイベント）
+function pickEventWithRepeatBoost(events, prevId) {
+    const weights = events.map(e => (prevId && prevId !== "normal" && e.id === prevId) ? EVENT_REPEAT_MULTIPLIER : 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < events.length; i++) {
+        r -= weights[i];
+        if (r < 0) return events[i];
+    }
+    return events[events.length - 1];
+}

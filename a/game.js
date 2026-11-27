@@ -1410,6 +1410,7 @@ nextYearPhaseBtn.addEventListener("click", () => {
         showFinalResult();
     } else {
         saveCurrentStrategies();
+        gameState.lastLocalEventId = receivedLocalEventId; // 翌年の抽選で使う、今年度の局地イベント
         gameState.year += 1;
 
         // 決算後に先に届いていたイベントがあれば、それを今年度のイベントとして使う
@@ -1824,8 +1825,9 @@ function subscribeRoomEvents(roomId) {
         const globalId = payload.payload.global_id;
         let localId = payload.payload.local_id;
         if (localId === "random_per_team") {
-            const randIdx = Math.floor(Math.random() * LOCAL_EVENTS.length);
-            localId = LOCAL_EVENTS[randIdx].id;
+            // 前年に当たった局地イベントは起こりやすくする（決算後に届いた場合は、今年度のイベントが前年分になる）
+            const prevLocalId = gamePhase === "settled" ? receivedLocalEventId : gameState.lastLocalEventId;
+            localId = pickEventWithRepeatBoost(LOCAL_EVENTS, prevLocalId).id;
         }
 
         if (gamePhase === "finished") return;
