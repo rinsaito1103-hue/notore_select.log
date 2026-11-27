@@ -1157,7 +1157,7 @@ endYearBtn.addEventListener("click", () => {
                 gameState.landHistory[index] = hhHist;
                 shieldStatus = "💥ハウス破壊";
             }
-            yieldRate *= 0.5;
+            yieldRate *= 0;
         }
         else if (localEvent.id === "good_weather") {
             yieldRate *= 2;
@@ -1342,7 +1342,7 @@ endYearBtn.addEventListener("click", () => {
 
             localReasonEl.textContent = `地域に【${localEvent.name}】が発生し、作物の収穫量が大きく低下しました。${isShielded ? 'しかし、事前に導入していた防衛資材（施設や農薬など）が一部の農地で作物をガードしました。' : '資材・施設による防御が不足していた農地では、大きな機会損失（下振れ要因）となっています。'}`;
         } else if (localEvent.id === "animal_damage") {
-            localReasonEl.textContent = `深刻な災害【${localEvent.name}】が発生。ハウス施設などの有無に関わらず、すべての作物が食い荒らされ収穫量が半分になりました。ビニールハウスは破壊されたため、再び使うには導入費用をもう一度支払う必要があります。`;
+            localReasonEl.textContent = `最悪の災害【${localEvent.name}】が発生。ハウス施設などの有無に関わらず、すべての作物が食い荒らされ収穫量が強制的に0kgとなりました。ビニールハウスは破壊されたため、再び使うには導入費用をもう一度支払う必要があります。`;
         } else if (localEvent.id === "good_weather") {
             localReasonEl.textContent = `奇跡の【${localEvent.name}】が到来！全ての農地で収穫量が2倍に大ブーストされ、計画を大きく上回る収益をもたらした最大の要因です。`;
         } else {
