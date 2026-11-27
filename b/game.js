@@ -27,6 +27,25 @@ let gamePhase = "title";
 let pendingNextEvents = null; // 決算後〜次年度設定前に届いたイベント（次の年度に使う）
 // 🧪 卒論の比較実験用：この版がどちらの群か（Supabaseの log_group 列に記録される）
 const LOG_GROUP = "nolog"; // "log" = ログあり群 / "nolog" = ログなし群
+const AUTO_FUND_AMOUNT = 50000000; // 💰 資金不足時に自動で追加する金額（5000万円）
+
+// 💰 資金の自動追加を Supabase（auto_fund_logs）に記録する（分析用）
+//   ※ supabase/add_auto_fund_logs.sql の実行前でもゲームは動く（記録だけが保存されない）
+function recordAutoFund(moneyBefore, investment, addedAmount) {
+    if (!gameState.roomId || !gameState.playerName) return;
+    supabaseClient.from('auto_fund_logs').insert([{
+        room_id: gameState.roomId,
+        player_name: gameState.playerName,
+        log_group: LOG_GROUP,
+        year: gameState.year,
+        money_before: moneyBefore,
+        investment: investment,
+        added_amount: addedAmount,
+        total_added: gameState.autoFundTotal
+    }]).then(res => {
+        if (res.error) console.warn("資金自動追加の記録に失敗しました", res.error);
+    });
+}
 const SAVE_KEY = "notore_nolog_save_v1"; // ログあり版と保存データが混ざらないよう別キー
 
 // 📡【新設】Supabase 受信アンテナの設定
@@ -1022,9 +1041,16 @@ beginBusinessBtn.addEventListener("click", () => {
         }
     });
 
+    // 💰 資金不足で次の年度に進めない場合は、自動で5000万円ずつ資金を追加して先に進める
     if (gameState.money < totalInvestment) {
-        alert("初期資金が足りません！投資を少し減らして再調整してください。");
-        return;
+        let addedAmount = 0;
+        while (gameState.money + addedAmount < totalInvestment) addedAmount += AUTO_FUND_AMOUNT;
+        const moneyBefore = gameState.money;
+        gameState.money += addedAmount;
+        gameState.autoFundCount = (gameState.autoFundCount || 0) + addedAmount / AUTO_FUND_AMOUNT;
+        gameState.autoFundTotal = (gameState.autoFundTotal || 0) + addedAmount;
+        recordAutoFund(moneyBefore, totalInvestment, addedAmount);
+        alert(`【資金不足のため資金を自動追加しました】\n投資総額 ${totalInvestment.toLocaleString()}円 に対して、所持資金が ${moneyBefore.toLocaleString()}円 しかありませんでした。\n資金を ${addedAmount.toLocaleString()}円 追加しました（このゲームでの追加合計: ${gameState.autoFundTotal.toLocaleString()}円）。`);
     }
 
     currentYearStartMoney = gameState.money;
@@ -1501,6 +1527,10 @@ function showFinalResult() {
     } else {
         resultRankElement.textContent = "🥀 ランクＣ：新米開拓農家";
         resultCommentElement.textContent = `資金が初期を下回ってしまいました。難易度の低い作物から始めたり、ITシステムでのカバーを試してみましょう！`;
+    }
+
+    if (gameState.autoFundTotal > 0) {
+        resultCommentElement.textContent += `（※資金不足のため、途中で合計 ${gameState.autoFundTotal.toLocaleString()}円 の資金が自動追加されています）`;
     }
 
     finalMoneyElement.textContent = gameState.money.toLocaleString();
