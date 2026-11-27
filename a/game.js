@@ -27,23 +27,24 @@ let gamePhase = "title";
 let pendingNextEvents = null; // 決算後〜次年度設定前に届いたイベント（次の年度に使う）
 // 🧪 卒論の比較実験用：この版がどちらの群か（Supabaseの log_group 列に記録される）
 const LOG_GROUP = "log"; // "log" = ログあり群 / "nolog" = ログなし群
-const AUTO_FUND_AMOUNT = 50000000; // 💰 資金不足時に自動で追加する金額（5000万円）
+const LOAN_UNIT = 50000000; // 💰 資金不足時に自動で受ける融資の単位（5000万円）。その年度の決算で全額返済する
 
-// 💰 資金の自動追加を Supabase（auto_fund_logs）に記録する（分析用）
-//   ※ supabase/add_auto_fund_logs.sql の実行前でもゲームは動く（記録だけが保存されない）
-function recordAutoFund(moneyBefore, investment, addedAmount) {
+// 💰 融資を Supabase（loan_logs）に記録する（分析用）
+//   ※ supabase/add_loan_logs.sql の実行前でもゲームは動く（記録だけが保存されない）
+function recordLoan(moneyBefore, investment, loanAmount) {
     if (!gameState.roomId || !gameState.playerName) return;
-    supabaseClient.from('auto_fund_logs').insert([{
+    supabaseClient.from('loan_logs').insert([{
         room_id: gameState.roomId,
         player_name: gameState.playerName,
         log_group: LOG_GROUP,
         year: gameState.year,
         money_before: moneyBefore,
         investment: investment,
-        added_amount: addedAmount,
-        total_added: gameState.autoFundTotal
+        loan_amount: loanAmount,
+        loan_count: loanAmount / LOAN_UNIT,
+        total_loan: gameState.loanTotal
     }]).then(res => {
-        if (res.error) console.warn("資金自動追加の記録に失敗しました", res.error);
+        if (res.error) console.warn("融資の記録に失敗しました", res.error);
     });
 }
 const SAVE_KEY = "notore_save_v1";
@@ -1041,19 +1042,21 @@ beginBusinessBtn.addEventListener("click", () => {
         }
     });
 
-    // 💰 資金不足で次の年度に進めない場合は、自動で5000万円ずつ資金を追加して先に進める
+    // 💰 資金不足で次の年度に進めない場合は、5000万円単位で自動的に融資を受けて先に進める（その年度の決算で全額返済）
+    const moneyBeforeLoan = gameState.money;
+    gameState.currentYearLoan = 0;
     if (gameState.money < totalInvestment) {
-        let addedAmount = 0;
-        while (gameState.money + addedAmount < totalInvestment) addedAmount += AUTO_FUND_AMOUNT;
-        const moneyBefore = gameState.money;
-        gameState.money += addedAmount;
-        gameState.autoFundCount = (gameState.autoFundCount || 0) + addedAmount / AUTO_FUND_AMOUNT;
-        gameState.autoFundTotal = (gameState.autoFundTotal || 0) + addedAmount;
-        recordAutoFund(moneyBefore, totalInvestment, addedAmount);
-        alert(`【資金不足のため資金を自動追加しました】\n投資総額 ${totalInvestment.toLocaleString()}円 に対して、所持資金が ${moneyBefore.toLocaleString()}円 しかありませんでした。\n資金を ${addedAmount.toLocaleString()}円 追加しました（このゲームでの追加合計: ${gameState.autoFundTotal.toLocaleString()}円）。`);
+        let loanAmount = 0;
+        while (gameState.money + loanAmount < totalInvestment) loanAmount += LOAN_UNIT;
+        gameState.money += loanAmount;
+        gameState.currentYearLoan = loanAmount;
+        gameState.loanCount = (gameState.loanCount || 0) + loanAmount / LOAN_UNIT;
+        gameState.loanTotal = (gameState.loanTotal || 0) + loanAmount;
+        recordLoan(moneyBeforeLoan, totalInvestment, loanAmount);
+        alert(`【資金不足のため融資を受けました】\n投資総額 ${totalInvestment.toLocaleString()}円 に対して、所持資金が ${moneyBeforeLoan.toLocaleString()}円 しかありませんでした。\n${loanAmount.toLocaleString()}円 の融資を受けて年度を開始します。\n※融資額は今年度の決算時に全額返済（資金から差し引き）されます。`);
     }
 
-    currentYearStartMoney = gameState.money;
+    currentYearStartMoney = moneyBeforeLoan; // 期首資金は融資を含めない
     currentYearExpenses = totalInvestment;
 
     gameState.money -= totalInvestment;
@@ -1310,6 +1313,19 @@ endYearBtn.addEventListener("click", () => {
 
     gameState.money += totalYearRevenue;
     gameState.cumRevenue += totalYearRevenue; 
+
+    // 💰 年度の最後に、その年度に受けた融資を全額返済する
+    const yearLoan = gameState.currentYearLoan || 0;
+    gameState.money -= yearLoan;
+    gameState.currentYearLoan = 0;
+    const loanRow = document.getElementById("stmt-loan-row");
+    const repayRow = document.getElementById("stmt-repay-row");
+    if (loanRow && repayRow) {
+        loanRow.style.display = yearLoan > 0 ? "" : "none";
+        repayRow.style.display = yearLoan > 0 ? "" : "none";
+        document.getElementById("stmt-loan").textContent = `＋ ${yearLoan.toLocaleString()} 円`;
+        document.getElementById("stmt-repay").textContent = `- ${yearLoan.toLocaleString()} 円`;
+    }
     moneyElement.textContent = gameState.money.toLocaleString();
 
     stmtStartMoney.textContent = `${currentYearStartMoney.toLocaleString()} 円`;
@@ -1544,8 +1560,8 @@ function showFinalResult() {
         resultCommentElement.textContent = `資金が初期を下回ってしまいました。難易度の低い作物から始めたり、ITシステムでのカバーを試してみましょう！`;
     }
 
-    if (gameState.autoFundTotal > 0) {
-        resultCommentElement.textContent += `（※資金不足のため、途中で合計 ${gameState.autoFundTotal.toLocaleString()}円 の資金が自動追加されています）`;
+    if (gameState.loanTotal > 0) {
+        resultCommentElement.textContent += `（※資金不足のため合計 ${gameState.loanCount}回・${gameState.loanTotal.toLocaleString()}円 の融資を受けました。融資は各年度の決算で返済済みです）`;
     }
 
     finalMoneyElement.textContent = gameState.money.toLocaleString();
